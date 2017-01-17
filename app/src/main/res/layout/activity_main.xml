@@ -11,16 +11,6 @@
     tools:context="com.bupt.hammad.behave.MainActivity">
 
     <TextView
-        android:text="Behave"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="68dp"
-        android:id="@+id/textView"
-        android:textSize="@android:dimen/notification_large_icon_width"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true" />
-
-    <TextView
         android:text="A behavior detection app"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -34,7 +24,18 @@
         android:text="Start"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_centerVertical="true"
+        android:id="@+id/startButton"
+        android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:id="@+id/startButton" />
+        android:layout_marginBottom="67dp" />
+
+    <TextView
+        android:text="Behave"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="144dp"
+        android:id="@+id/textView"
+        android:textSize="@android:dimen/notification_large_icon_width"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true" />
 </RelativeLayout>
