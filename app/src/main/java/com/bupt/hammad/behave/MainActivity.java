@@ -10,8 +10,13 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 
+// This is the first activity that will be called when the app runs
 public class MainActivity extends AppCompatActivity {
 
+    ///////////////////////
+    // Declaration space //
+    ///////////////////////
+    //
     final int MY_PERMISSIONS_REQUEST_COARSE_LOCATION = 0;
     final int MY_PERMISSIONS_REQUEST_FINE_LOCATION = 1;
 
