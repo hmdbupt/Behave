@@ -12,7 +12,6 @@ import android.location.LocationManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -66,14 +65,22 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     TextView labelY;
     TextView labelZ;
 
+    TextView orientationYaw;
+    TextView orientationPitch;
+    TextView orientationRoll;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_start);
 
-        labelX = (TextView) findViewById(R.id.textViewX);
-        labelY = (TextView) findViewById(R.id.textViewY);
-        labelZ = (TextView) findViewById(R.id.textViewZ);
+//        labelX = (TextView) findViewById(R.id.textViewX);
+//        labelY = (TextView) findViewById(R.id.textViewY);
+//        labelZ = (TextView) findViewById(R.id.textViewZ);
+
+//        orientationYaw = (TextView) findViewById(R.id.orientationYaw);
+//        orientationPitch = (TextView) findViewById(R.id.orientationPitch);
+        orientationRoll = (TextView) findViewById(R.id.orientationRoll);
 
         ////////////////////////////
         // Initialize objects here//
@@ -152,13 +159,13 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         calculateOrientation.Calculate();
         float[] orientation = new float[3];
         orientation = calculateOrientation.getOrientation();
-//        labelX.setText(""+Math.round(Math.toDegrees(orientation[0]+360)%360));
-//        labelY.setText(""+Math.round(Math.toDegrees(orientation[1]+360)%360));
-//        labelZ.setText(""+Math.round(Math.toDegrees(orientation[2]+360)%360));
+//        orientationYaw.setText(""+Math.round(Math.toDegrees(orientation[0]+360)%360));
+//        orientationPitch.setText(""+Math.round(Math.toDegrees(orientation[1]+360)%360));
+        orientationRoll.setText(""+Math.round(Math.toDegrees(orientation[2])));
 
-        labelX.setText(""+Math.round(Math.toDegrees(gyroscopeValues[0])));
-        labelY.setText(""+Math.round(Math.toDegrees(gyroscopeValues[1])));
-        labelZ.setText(""+Math.round(Math.toDegrees(gyroscopeValues[2])));
+//        labelX.setText(""+Math.round(Math.toDegrees(gyroscopeValues[0])));
+//        labelY.setText(""+Math.round(Math.toDegrees(gyroscopeValues[1])));
+//        labelZ.setText(""+Math.round(Math.toDegrees(gyroscopeValues[2])));
 
     }
 
@@ -180,6 +187,4 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         super.onDestroy();
         sensorManager.unregisterListener(this);
     }
-
-
 }

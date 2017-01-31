@@ -18,30 +18,57 @@
         android:layout_alignParentBottom="true"
         android:layout_alignParentStart="true" />
 
+    <!--<TextView-->
+        <!--android:text="Gyroscope X - Pitch"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:id="@+id/textViewX"-->
+        <!--android:textAppearance="@android:style/TextAppearance.Material.Large"-->
+        <!--android:layout_centerVertical="true"-->
+        <!--android:layout_centerHorizontal="true" />-->
+
+    <!--<TextView-->
+        <!--android:text="Gyroscope Z - Yaw"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:id="@+id/textViewZ"-->
+        <!--android:textAppearance="@android:style/TextAppearance.Material.Large"-->
+        <!--android:layout_below="@+id/textViewY"-->
+        <!--android:layout_alignEnd="@+id/textViewX" />-->
+
+    <!--<TextView-->
+        <!--android:text="Gyroscope Y - Roll"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:id="@+id/textViewY"-->
+        <!--android:textAppearance="@android:style/TextAppearance.Material.Large"-->
+        <!--android:layout_below="@+id/textViewX"-->
+        <!--android:layout_alignEnd="@+id/textViewX" />-->
+
+    <!--<TextView-->
+        <!--android:text="Orientation Z - Yaw"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:id="@+id/orientationYaw"-->
+        <!--android:textAppearance="@android:style/TextAppearance.Material.Large"-->
+        <!--android:layout_above="@+id/textViewX"-->
+        <!--android:layout_alignEnd="@+id/textViewX" />-->
+
     <TextView
-        android:text="Text View X"
+        android:text="Orientation Y - Roll"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/textViewX"
+        android:id="@+id/orientationRoll"
         android:textAppearance="@android:style/TextAppearance.Material.Large"
         android:layout_centerVertical="true"
         android:layout_centerHorizontal="true" />
 
-    <TextView
-        android:text="Text View Z"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/textViewZ"
-        android:textAppearance="@android:style/TextAppearance.Material.Large"
-        android:layout_below="@+id/textViewY"
-        android:layout_alignEnd="@+id/textViewX" />
-
-    <TextView
-        android:text="Text View Y"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/textViewY"
-        android:textAppearance="@android:style/TextAppearance.Material.Large"
-        android:layout_below="@+id/textViewX"
-        android:layout_alignEnd="@+id/textViewX" />
+    <!--<TextView-->
+        <!--android:text="Orientation X - Pitch"-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:id="@+id/orientationPitch"-->
+        <!--android:textAppearance="@android:style/TextAppearance.Material.Large"-->
+        <!--android:layout_above="@+id/orientationRoll"-->
+        <!--android:layout_alignStart="@+id/textViewX" />-->
 </RelativeLayout>
