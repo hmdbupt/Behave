@@ -3,10 +3,10 @@ package com.bupt.hammad.behave;
 import java.text.DecimalFormat;
 
 public class MovingAverage {
-    private float circularBuffer[];		//Save sensor's deltaL data
+    private float circularBuffer[];		        //Save sensor's deltaL data
 	private float returnAverageOfSensor;  		//Return average of sensor
-	private float returnAverageOfSensor2DF; // Value converted into decimal format .00
-	private int Index;					//Location of sensor data array
+	private float returnAverageOfSensor2DF;     // Value converted into decimal format .00
+	private int Index;					        //Location of sensor data array
 	private int count;
 	
 	//MovingAverage is a constructor of the class MovingAverage
