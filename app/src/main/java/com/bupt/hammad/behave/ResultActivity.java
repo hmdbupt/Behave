@@ -26,7 +26,7 @@ public class ResultActivity extends AppCompatActivity {
 
         Intent iResultActivity = new Intent();
         iResultActivity.getExtras();
-        driveTime = bundle.getString("DRIVE_TIME");
+        driveTime = bundle.getString("RIDE_TIME");
         driveTimeTextView.setText(driveTime);
 
         Button exitButton = (Button) findViewById(R.id.exitButton);

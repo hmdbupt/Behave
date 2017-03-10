@@ -1,8 +1,10 @@
 package com.bupt.hammad.behave;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -13,14 +15,15 @@ import android.location.LocationManager;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.os.SystemClock;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -64,15 +67,15 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     ///////////////////////
     // Longs
     //
-    //Trip start time, trip end time and total drive time
+    //Trip start time, trip end time and total ride time
     private long startTime;
     private long endTime;
-    private long driveTime;
+    private long rideTime;
     private long gyroRoll;
     // Strings //
     //
-    //Convert drive time into string
-    private String stringDriveTime;
+    //Convert ride time into string
+    private String stringRideTime;
     //
     // int //
     int leaningCounter = 0;
@@ -86,6 +89,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
 
     // TextViews //
     TextView orientationRoll;
+    TextView leanView;
     TextView hudView;
 
 
@@ -95,7 +99,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
 
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
-    //NO BUMP state is when the car is driving straight
+    //NO BUMP state is when the car is riding straight
     final static int No_Bump = 0;
     //ONE BUMP state is when the car takes a left/right turn
     final static int One_Bump = 1;
@@ -184,6 +188,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public static String filename = "Vehicle Sensing";
 
     DataSet dataset = new DataSet();
+    private Context context;
     ///////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -192,7 +197,10 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_start);
 
+        Window window = this.getWindow();
+
         orientationRoll = (TextView) findViewById(R.id.orientationRoll);
+        leanView = (TextView) findViewById(R.id.lean_text_view);
         hudView = (TextView) findViewById(R.id.hud_text_view);
 
         ////////////////////////////
@@ -219,7 +227,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         movingAvgDirection = new MovingAverage(5);
         movingAvgAcceleration = new MovingAverage(3);
 
-        hudView.setText("Driving Straight");
+        hudView.setText("Riding Straight");
 
         // GPS location permission check
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -233,10 +241,12 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             return;
         }
         // Gets the current location from GPS
-        location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+        if (location == null){
+            location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+        }
 
         // Request location from GPS and find speed
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,
                 1000, 0.2f, new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
@@ -266,7 +276,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
 
         // For avoiding null pointer exception from GPS location
         if (location == null) {
-            location = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+            location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
         }else{
             updateSpeed(location);
         }
@@ -297,14 +307,14 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             public void onClick(View view) {
                 // Saving current system time into end time
                 endTime = System.currentTimeMillis();
-                // Calculating drive time
-                driveTime = endTime - startTime;
+                // Calculating ride time
+                rideTime = endTime - startTime;
                 // Converting time from milliseconds format to 00:00:00 and saving into string
-                stringDriveTime = TimeConverter.formatLongToString(driveTime);
+                stringRideTime = TimeConverter.formatLongToString(rideTime);
                 // Creating an Intent to start result activity
                 Intent resultActivityIntent = new Intent(StartActivity.this, ResultActivity.class);
                 // Packaging bundle with data
-                bundle.putString("DRIVE_TIME",stringDriveTime);
+                bundle.putString("RIDE_TIME", stringRideTime);
                 // Sending bundle to result activity
                 resultActivityIntent.putExtras(bundle);
                 // Starting result activity
@@ -324,11 +334,15 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             }else if (msg.what == 0x234){
                 switch ((String) msg.obj){
                     case "Leaning Left":
-                        hudView.setText("Dangerous Lean");
+                        leanView.setText("Leaning Left");
                         showFlag = 0;
                         break;
                     case "Leaning Right":
-                        hudView.setText("Dangerous Lean");
+                        leanView.setText("Leaning Right");
+                        showFlag = 0;
+                        break;
+                    case "No Lean":
+                        leanView.setText("Not Leaning");
                         showFlag = 0;
                         break;
                     case "Left Turn":
@@ -343,26 +357,6 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         hudView.setText("U-Turn");
                         ShowFlag = 0;
                         break;
-//                case "Left Lane Change":
-//                    hudTextView.setText("Left Lane Change");
-//                    carImageView.setImageResource(images[4]);
-//                    ShowFlag = 0;
-//                    break;
-//                case "Multiple Left Lane Change":
-//                    hudTextView.setText("Multiple Left Lane Change");
-//                    carImageView.setImageResource(images[4]);
-//                    ShowFlag = 0;
-//                    break;
-//                case "Right Lane Change":
-//                    hudTextView.setText("Right Lane Change");
-//                    carImageView.setImageResource(images[5]);
-//                    ShowFlag = 0;
-//                    break;
-//                case "Multiple Right Lane Change":
-//                    hudTextView.setText("Multiple Right Lane Change");
-//                    carImageView.setImageResource(images[5]);
-//                    ShowFlag = 0;
-//                    break;
                     case "Brake":
                         hudView.setText("Brake");
                         break;
@@ -371,7 +365,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         break;
                     default:
                         if (showFlag>3){
-                            hudView.setText("");
+                            hudView.setText("Riding Straight");
                             showFlag = 0;
                         }
                         showFlag++;
@@ -453,7 +447,19 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         float[] rollOrientation;
         rollOrientation = findOrientation.getOrientation();
         gyroRoll = Math.round(Math.toDegrees(rollOrientation[2]));
-        orientationRoll.setText(""+gyroRoll);
+        long modGyroRoll = 0;
+        if (gyroRoll < 0){
+            modGyroRoll = 0 - gyroRoll;
+        }else{
+            modGyroRoll = gyroRoll;
+        }
+        orientationRoll.setText(""+modGyroRoll+"°");
+        View activityStart = findViewById(R.id.activity_start);
+        if(modGyroRoll > 35){
+            activityStart.setBackgroundColor(Color.parseColor("#F44336"));
+        }else{
+            activityStart.setBackgroundColor(Color.parseColor("#FF3F51B5"));
+        }
     }
 
     @Override
@@ -516,6 +522,20 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             }
             MAX_OF_BRAKE = 0;
             FLAG_OF_BRAKE = 0;
+        }
+
+        if (gyroRoll == 0 ){
+            resultMessage.what = 0x234;
+            resultMessage.obj = "No Lean";
+            handler.sendMessage(resultMessage);
+        }else if (gyroRoll < 0){
+            resultMessage.what = 0x234;
+            resultMessage.obj = "Leaning Left";
+            handler.sendMessage(resultMessage);
+        }else if (gyroRoll > 0){
+            resultMessage.what = 0x234;
+            resultMessage.obj = "Leaning Right";
+            handler.sendMessage(resultMessage);
         }
 
 

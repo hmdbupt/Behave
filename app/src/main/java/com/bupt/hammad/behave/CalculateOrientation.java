@@ -13,6 +13,8 @@ public class CalculateOrientation {
     private float[] accelerometerValues = new float[3];
     // Magnetometer values
     private float[] magnetometerValues = new float[3];
+    // Moving Average Filter
+    MovingAverage movingAverage = new MovingAverage(5);
 
     public void Calculate(){
         // Calculate device orientation

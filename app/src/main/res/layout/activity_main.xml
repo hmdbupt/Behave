@@ -8,7 +8,8 @@
     android:paddingLeft="@dimen/activity_horizontal_margin"
     android:paddingRight="@dimen/activity_horizontal_margin"
     android:paddingTop="@dimen/activity_vertical_margin"
-    tools:context="com.bupt.hammad.behave.MainActivity">
+    tools:context="com.bupt.hammad.behave.MainActivity"
+    android:background="@color/colorPrimary">
 
     <TextView
         android:text="A behavior detection app"
@@ -18,7 +19,8 @@
         android:id="@+id/textView2"
         android:layout_below="@+id/textView"
         android:layout_centerHorizontal="true"
-        android:textStyle="italic" />
+        android:textStyle="italic"
+        android:textColor="?android:attr/textColorTertiaryInverse" />
 
     <Button
         android:text="Start"
@@ -37,5 +39,8 @@
         android:id="@+id/textView"
         android:textSize="@android:dimen/notification_large_icon_width"
         android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true" />
+        android:layout_centerHorizontal="true"
+        android:textColor="?android:attr/textColorPrimaryInverse"
+        android:textColorHighlight="?android:attr/textColorPrimaryInverse"
+        android:shadowColor="@android:color/darker_gray" />
 </RelativeLayout>
