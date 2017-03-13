@@ -19,12 +19,64 @@
         android:layout_centerHorizontal="true"
         android:id="@+id/exitButton" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="100dp"
-        android:id="@+id/driveTimeTextView"
-        android:textColor="?android:attr/textColorTertiaryInverse" />
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/driveTimeTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:elegantTextHeight="false"
+            android:textAlignment="center"
+            android:textColor="?android:attr/textColorTertiaryInverse"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/leftTurnTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:elegantTextHeight="false"
+            android:textAlignment="center"
+            android:textColor="?android:attr/textColorTertiaryInverse"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/rightTurnTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:elegantTextHeight="false"
+            android:textAlignment="center"
+            android:textColor="?android:attr/textColorTertiaryInverse"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/uTurnTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:elegantTextHeight="false"
+            android:textAlignment="center"
+            android:textColor="?android:attr/textColorTertiaryInverse"
+            android:textSize="24sp" />
+
+        <!--<TextView-->
+            <!--android:id="@+id/dangerousLeftLean"-->
+            <!--android:layout_width="match_parent"-->
+            <!--android:layout_height="wrap_content"-->
+            <!--android:elegantTextHeight="false"-->
+            <!--android:textAlignment="center"-->
+            <!--android:textColor="?android:attr/textColorTertiaryInverse"-->
+            <!--android:textSize="24sp" />-->
+
+        <!--<TextView-->
+            <!--android:id="@+id/dangerousRightLean"-->
+            <!--android:layout_width="match_parent"-->
+            <!--android:layout_height="wrap_content"-->
+            <!--android:elegantTextHeight="false"-->
+            <!--android:textAlignment="center"-->
+            <!--android:textColor="?android:attr/textColorTertiaryInverse"-->
+            <!--android:textSize="24sp" />-->
+    </LinearLayout>
+
 </RelativeLayout>

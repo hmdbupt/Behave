@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/activity_start"
     android:layout_width="match_parent"
@@ -19,38 +20,56 @@
         android:layout_alignParentBottom="true"
         android:layout_alignParentStart="true" />
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerVertical="true"
-        android:layout_centerHorizontal="true"
-        android:id="@+id/hud_text_view"
-        android:text="@string/hud_text"
-        android:textAppearance="@style/TextAppearance.AppCompat.Display2"
-        android:textColor="?android:attr/textColorPrimaryInverse" />
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/lean_text_view"
-        android:textSize="34sp"
-        android:textColor="?android:attr/textColorTertiaryInverse"
-        android:layout_below="@+id/hud_text_view"
-        android:layout_centerHorizontal="true"
-        android:textColorHint="?android:attr/textColorHintInverse" />
+        <TextView
+            android:id="@+id/hud_text_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:layout_centerVertical="true"
+            android:text="@string/hud_text"
+            android:textAlignment="center"
+            android:textAppearance="@style/TextAppearance.AppCompat.Display2"
+            android:textColor="?android:attr/textColorPrimaryInverse"
+            android:textSize="34sp" />
 
-    <TextView
-        android:text="@string/leaning_text"
-        android:layout_width="wrap_content"
+        <TextView
+            android:id="@+id/lean_text_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/hud_text_view"
+            android:layout_centerHorizontal="true"
+            android:hint="@string/leaning_direction"
+            android:textAlignment="center"
+            android:textColor="?android:attr/textColorTertiaryInverse"
+            android:textColorHint="?android:attr/textColorHintInverse"
+            android:textSize="34sp" />
+
+        <TextView
+            android:id="@+id/orientationRoll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/lean_text_view"
+            android:layout_centerHorizontal="true"
+            android:hint="@string/leaning_degree"
+            android:text="@string/leaning_text"
+            android:textAlignment="center"
+            android:textAppearance="@android:style/TextAppearance.Material.Large"
+            android:textColor="?android:attr/textColorTertiaryInverse"
+            android:textColorHighlight="?android:attr/textColorTertiaryInverse"
+            android:textColorHint="?android:attr/textColorHintInverse"
+            android:textSize="32sp" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:id="@+id/orientationRoll"
-        android:textAppearance="@android:style/TextAppearance.Material.Large"
-        android:textColor="?android:attr/textColorTertiaryInverse"
-        android:textColorHighlight="?android:attr/textColorTertiaryInverse"
-        android:textSize="32sp"
-        android:textColorHint="?android:attr/textColorHintInverse"
-        android:layout_below="@+id/lean_text_view"
-        android:layout_centerHorizontal="true" />
+        android:src="@drawable/empty_view"/>
 
 
 </RelativeLayout>

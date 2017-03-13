@@ -4,5 +4,9 @@
     <string name="leaning_text"></string>
     <string name="straight">Straight</string>
     <string name="u_turn_2">U-Turn</string>
+    <string name="leaning_direction">Leaning Direction</string>
+    <string name="leaning_degree">Degree of Lean</string>
+    <string name="dangerous_left_lean">Dangerous Left Lean</string>
+    <string name="dangerous_right_lean">Dangerous Right Lean</string>
 
 </resources>

@@ -22,8 +22,8 @@ import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -72,6 +72,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     private long endTime;
     private long rideTime;
     private long gyroRoll;
+    long modGyroRoll = 0;
     // Strings //
     //
     //Convert ride time into string
@@ -91,6 +92,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     TextView orientationRoll;
     TextView leanView;
     TextView hudView;
+    // ImageViews //
+    ImageView imageView;
 
 
     //Gets the Yaw rate from gyroscope
@@ -137,14 +140,12 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public int FLAG_OF_BRAKE = 0;
     public float MAX_OF_BRAKE = 0;
 
-    //Set the sampling frequency
+    // Data collection variables
     public float numberOfLeftTurns = 0;
     public float numberOfRightTurns = 0;
     public float numberOfUTurns = 0;
-    public float numberOfLeftToRightTurns = 0;
-    public float numberOfLeftToRightTurnsForMultipleLaneChange = 0;
-    public float numberOfRightToLeftTurns = 0;
-    public float numberOfRightToLeftTurnsForMultipleLaneChange = 0;
+    public float numberOfDangerousLeftLeans = 0;
+    public float numberOfDangerousRightLeans = 0;
     public float numberOfBrakes = 0;
     public float numberOfEmergencyBrakes = 0;
 
@@ -187,6 +188,12 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public String mode;
     public static String filename = "Vehicle Sensing";
 
+    // Images
+    public int[] images = new int[]{
+            R.drawable.empty_view,
+            R.drawable.warning
+    };
+
     DataSet dataset = new DataSet();
     private Context context;
     ///////////////////////////////////////////////////////////////////////////////////////////
@@ -202,6 +209,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         orientationRoll = (TextView) findViewById(R.id.orientationRoll);
         leanView = (TextView) findViewById(R.id.lean_text_view);
         hudView = (TextView) findViewById(R.id.hud_text_view);
+        imageView = (ImageView) findViewById(R.id.imageView);
 
         ////////////////////////////
         // Initialize objects here//
@@ -282,7 +290,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         }
 
         // Initializing Button
-        Button finishButton = (Button) findViewById(R.id.finishButton);
+        final Button finishButton = (Button) findViewById(R.id.finishButton);
 
         // Assign the current time to startTime
         startTime = System.currentTimeMillis();
@@ -315,10 +323,16 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 Intent resultActivityIntent = new Intent(StartActivity.this, ResultActivity.class);
                 // Packaging bundle with data
                 bundle.putString("RIDE_TIME", stringRideTime);
+                bundle.putFloat("LEFT_TURNS", numberOfLeftTurns);
+                bundle.putFloat("RIGHT_TURNS", numberOfRightTurns);
+                bundle.putFloat("U_TURNS", numberOfUTurns);
+                bundle.putFloat("DANGEROUS_LEFT_LEAN", numberOfDangerousLeftLeans);
+                bundle.putFloat("DANGEROUS_RIGHT_LEAN", numberOfDangerousRightLeans);
                 // Sending bundle to result activity
                 resultActivityIntent.putExtras(bundle);
                 // Starting result activity
                 startActivity(resultActivityIntent);
+                finish();
             }
         });
     }
@@ -339,6 +353,16 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         break;
                     case "Leaning Right":
                         leanView.setText("Leaning Right");
+                        showFlag = 0;
+                        break;
+                    case "Dangerous Left Lean":
+                        hudView.setText("Dangerous Lean");
+                        imageView.setImageResource(images[1]);
+                        showFlag = 0;
+                        break;
+                    case "Dangerous Right Lean":
+                        hudView.setText("Dangerous Lean");
+                        imageView.setImageResource(images[1]);
                         showFlag = 0;
                         break;
                     case "No Lean":
@@ -363,7 +387,10 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     case "Emergency Brake":
                         hudView.setText("Emergency Brake");
                         break;
-                    default:
+                    case "Remove Image":
+                        imageView.setImageResource(images[0]);
+                        break;
+                    case "Riding Straight":
                         if (showFlag>3){
                             hudView.setText("Riding Straight");
                             showFlag = 0;
@@ -447,7 +474,6 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         float[] rollOrientation;
         rollOrientation = findOrientation.getOrientation();
         gyroRoll = Math.round(Math.toDegrees(rollOrientation[2]));
-        long modGyroRoll = 0;
         if (gyroRoll < 0){
             modGyroRoll = 0 - gyroRoll;
         }else{
@@ -513,9 +539,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 handler.sendMessage(resultMessage);
                 numberOfBrakes++;
                 if (MAX_OF_BRAKE < EMERGENCY) {
-                    resultMessage = new Message();
                     resultMessage.what = 0x234;
-                    resultMessage.obj = "Brake";
+                    resultMessage.obj = "Emergency Brake";
                     handler.sendMessage(resultMessage);
                     numberOfEmergencyBrakes++;
                 }
@@ -523,6 +548,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             MAX_OF_BRAKE = 0;
             FLAG_OF_BRAKE = 0;
         }
+
 
         if (gyroRoll == 0 ){
             resultMessage.what = 0x234;
@@ -532,10 +558,34 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             resultMessage.what = 0x234;
             resultMessage.obj = "Leaning Left";
             handler.sendMessage(resultMessage);
+            if (Math.abs(gyroRoll) > 35){
+                resultMessage = new Message();
+                resultMessage.what = 0x234;
+                resultMessage.obj = "Dangerous Left Lean";
+                handler.sendMessage(resultMessage);
+                numberOfDangerousLeftLeans++;
+            }else if (Math.abs(gyroRoll)<35){
+                resultMessage = new Message();
+                resultMessage.what = 0x234;
+                resultMessage.obj = "Remove Image";
+                handler.sendMessage(resultMessage);
+            }
         }else if (gyroRoll > 0){
             resultMessage.what = 0x234;
             resultMessage.obj = "Leaning Right";
             handler.sendMessage(resultMessage);
+            if (Math.abs(gyroRoll) > 35){
+                resultMessage = new Message();
+                resultMessage.what = 0x234;
+                resultMessage.obj = "Dangerous Right Lean";
+                handler.sendMessage(resultMessage);
+                numberOfDangerousRightLeans++;
+            }else if (Math.abs(gyroRoll)<35){
+                resultMessage = new Message();
+                resultMessage.what = 0x234;
+                resultMessage.obj = "Remove Image";
+                handler.sendMessage(resultMessage);
+            }
         }
 
 
@@ -591,7 +641,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 BAD_TURN_1 = 0;
                 resultMessage = new Message();
                 resultMessage.what = 0x234;
-                resultMessage.obj = getString(R.string.straight);
+                resultMessage.obj = "Riding Straight";
                 handler.sendMessage(resultMessage);
             }
 
@@ -624,37 +674,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     ALL_OF_BUMP++;
                     BAD_TURN += BAD_TURN_2;
 
-                    if (/*Math.abs(getDistance(speeds, vs, begin, end2)) <= 4 && */(max * max1 < 0)/* && Math.abs(getDistance(speeds, vs, begin, end2)) > 1.5*/) {    //&&(max*max1<0)
-                        //Toast.makeText(MainActivity.this, "Lane Change", Toast.LENGTH_SHORT).show();
-                        if (max1 > 0) {
-                            resultMessage = new Message();
-                            resultMessage.what = 0x234;
-                            if(Math.abs(getDistance(speeds, vs, begin, end2)) <= 4){
-                                resultMessage.obj = "Right Lane Change";
-                                numberOfRightToLeftTurns++;
-                            }
-                            else{
-                                resultMessage.obj = "Multiple Right Lane Change";
-                                numberOfRightToLeftTurnsForMultipleLaneChange++;
-                                // writeSDCard(message + "\t" + "向左多排变道" + "\t" + angle_calculate(vs, begin, end2)  + "\t" + 0.05*(end-begin)+ "\t" +
-                                //       getDistance(speeds, vs, begin, end2) + "\n");
-                            }
-                            handler.sendMessage(resultMessage);
-                        } else if (max1 < 0) {
-                            resultMessage = new Message();
-                            resultMessage.what = 0x234;
-                            if(Math.abs(getDistance(speeds, vs, begin, end2)) <= 4){
-                                resultMessage.obj = "Left Lane Change";
-                                numberOfLeftToRightTurns++;
-                            }
-                            else{
-                                resultMessage.obj = "Multiple Left Lane Change";
-                                numberOfLeftToRightTurnsForMultipleLaneChange++;}
-                            handler.sendMessage(resultMessage);
-                        }
-                    }
                     //两个反向凸点区分变道、在弯曲的道路上
-                    else if (max * max1 > 0) {
+                    if (max * max1 > 0) {
                         if (angle_calculate(vs, begin, end2) <= -60 && angle_calculate(vs, begin, end2) >= -135) {
                             //Toast.makeText(MainActivity.this, "Turn Right finished", Toast.LENGTH_SHORT).show();
                             resultMessage = new Message();
@@ -724,7 +745,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     } else {
                         resultMessage = new Message();
                         resultMessage.what = 0x234;
-                        resultMessage.obj = "Straight";
+                        resultMessage.obj = "Riding Straight";
                         handler.sendMessage(resultMessage);
                     }
                 }
@@ -778,7 +799,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 } else {
                     resultMessage = new Message();
                     resultMessage.what = 0x234;
-                    resultMessage.obj = getString(R.string.straight);
+                    resultMessage.obj = "Riding Straight";
                     handler.sendMessage(resultMessage);
                 }
 
