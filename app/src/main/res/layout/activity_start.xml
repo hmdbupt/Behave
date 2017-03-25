@@ -14,13 +14,21 @@
 
     <Button
         android:text="Finish"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/finishButton"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentStart="true" />
+        android:layout_centerHorizontal="true" />
+
+    <ImageView
+        android:layout_alignParentTop="true"
+        android:id="@+id/imageView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:src="@drawable/empty_view"/>
 
     <LinearLayout
+        android:layout_above="@id/finishButton"
         android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
@@ -29,6 +37,7 @@
             android:id="@+id/hud_text_view"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:keepScreenOn="true"
             android:layout_centerHorizontal="true"
             android:layout_centerVertical="true"
             android:text="@string/hud_text"
@@ -64,12 +73,6 @@
             android:textColorHint="?android:attr/textColorHintInverse"
             android:textSize="32sp" />
     </LinearLayout>
-
-    <ImageView
-        android:id="@+id/imageView"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:src="@drawable/empty_view"/>
 
 
 </RelativeLayout>

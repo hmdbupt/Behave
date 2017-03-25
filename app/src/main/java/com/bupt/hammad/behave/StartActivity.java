@@ -15,6 +15,7 @@ import android.location.LocationManager;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
+import android.os.PowerManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -170,8 +171,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public float[] speeds = new float[200];
     public float[] velocitys = new float[200];
 
-    Timer timerDataProcess = new Timer();
-    Timer timerGPSUpdate = new Timer();
+    Timer timer = new Timer();
     // Get the three dimensional values from accelerometer
     public float[] accelerometerValues = new float[3];
 
@@ -203,8 +203,6 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_start);
-
-        Window window = this.getWindow();
 
         orientationRoll = (TextView) findViewById(R.id.orientationRoll);
         leanView = (TextView) findViewById(R.id.lean_text_view);
@@ -296,13 +294,13 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         startTime = System.currentTimeMillis();
 
         // Timers
-        timerDataProcess.schedule(new TimerTask() {
+        timer.schedule(new TimerTask() {
             @Override
             public void run() {
                 dataProcess();
             }
         },0,50);
-        timerGPSUpdate.schedule(new TimerTask() {
+        timer.schedule(new TimerTask() {
             @Override
             public void run() {
                 handler.sendEmptyMessage(0x110);
@@ -391,11 +389,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         imageView.setImageResource(images[0]);
                         break;
                     case "Riding Straight":
-                        if (showFlag>3){
-                            hudView.setText("Riding Straight");
-                            showFlag = 0;
-                        }
-                        showFlag++;
+                        hudView.setText("Riding Straight");
                         break;
                 }
             }
@@ -481,11 +475,11 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         }
         orientationRoll.setText(""+modGyroRoll+"°");
         View activityStart = findViewById(R.id.activity_start);
-        if(modGyroRoll > 35){
-            activityStart.setBackgroundColor(Color.parseColor("#F44336"));
-        }else{
-            activityStart.setBackgroundColor(Color.parseColor("#FF3F51B5"));
-        }
+//        if(modGyroRoll > 35){
+//            activityStart.setBackgroundColor(Color.parseColor("#F44336"));
+//        }else{
+//            activityStart.setBackgroundColor(Color.parseColor("#FF3F51B5"));
+//        }
     }
 
     @Override

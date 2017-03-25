@@ -1,11 +1,19 @@
 package com.bupt.hammad.behave;
 
 import android.content.Intent;
+import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 public class ResultActivity extends AppCompatActivity {
 
@@ -14,11 +22,14 @@ public class ResultActivity extends AppCompatActivity {
 
     // Bundle variables
     private String driveTime;
-    private float leftTurns;
-    private float rightTurns;
-    private float uTurns;
+    private int leftTurns;
+    private int rightTurns;
+    private int uTurns;
     private float dangerousLeftLeans;
     private float dangerousRightLeans;
+
+    // Filename
+    private String filename = "Riding stats.txt";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,9 +52,9 @@ public class ResultActivity extends AppCompatActivity {
         bundle = new Bundle();
         bundle = getIntent().getExtras();
         driveTime = bundle.getString("RIDE_TIME");
-        leftTurns = bundle.getFloat("LEFT_TURNS");
-        rightTurns = bundle.getFloat("RIGHT_TURNS");
-        uTurns = bundle.getFloat("U_TURNS");
+        leftTurns = (int) bundle.getFloat("LEFT_TURNS");
+        rightTurns = (int) bundle.getFloat("RIGHT_TURNS");
+        uTurns = (int) bundle.getFloat("U_TURNS");
         dangerousLeftLeans = bundle.getFloat("DANGEROUS_LEFT_LEAN");
         dangerousRightLeans = bundle.getFloat("DANGEROUS_RIGHT_LEAN");
 
@@ -51,17 +62,43 @@ public class ResultActivity extends AppCompatActivity {
         leftTurnTextView.setText("Left Turns: "+leftTurns);
         rightTurnTextView.setText("Right Turns: "+rightTurns);
         uTurnTextView.setText("U-Turns: "+uTurns);
+
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat("| yyyy-MM-dd | HH:mm:ss |");
+        String simpleDateFormatString = simpleDateFormat.format(new Date());
+
+        writeSDCard("===== "+simpleDateFormatString+" ====="+"\n"+
+                "Total riding time: "+driveTime+"\n"+
+                "Left turns: "+leftTurns+"\n"+
+                "Right turns: "+rightTurns+"\n"+
+                "U-Turns: "+uTurns+"\n");
 //        dangerousLeftLean.setText("Dangerous Left Leans: "+dangerousLeftLeans);
 //        dangerousRightLean.setText("Dangerous Right Leans: "+dangerousRightLeans);
 
+        // Save data on SD-Card
         Button exitButton = (Button) findViewById(R.id.exitButton);
         exitButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+
                 Intent iMainActivity = new Intent(ResultActivity.this, MainActivity.class);
                 startActivity(iMainActivity);
                 finish();
             }
         });
+    }
+
+    private void writeSDCard(String string){
+        try{
+            if (Environment.getExternalStorageState().equals(
+                    Environment.MEDIA_MOUNTED)) {
+                File directory = Environment.getExternalStorageDirectory();
+                FileOutputStream outFileStream = new FileOutputStream(
+                        directory.getCanonicalPath() + "/" + filename , true);
+                outFileStream.write(string.getBytes());
+                outFileStream.close();
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
 }
