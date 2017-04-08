@@ -3,12 +3,15 @@ package com.bupt.hammad.behave;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.location.GpsSatellite;
+import android.location.GpsStatus;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -16,13 +19,19 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.os.PowerManager;
+import android.os.SystemClock;
+import android.preference.PreferenceManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.Toolbar;
+import android.text.SpannableString;
+import android.text.style.RelativeSizeSpan;
 import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.Button;
+import android.widget.Chronometer;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -31,10 +40,18 @@ import java.io.FileOutputStream;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class StartActivity extends AppCompatActivity implements SensorEventListener {
+
+// Speedometer
+import com.gc.materialdesign.views.ProgressBarCircularIndeterminate;
+import com.gc.materialdesign.widgets.Dialog;
+import com.google.gson.Gson;
+import com.melnykov.fab.FloatingActionButton;
+
+public class StartActivity extends AppCompatActivity implements SensorEventListener, LocationListener, GpsStatus.Listener {
 
     ///////////////////////
     // Declaration space //
@@ -152,7 +169,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
 
     public int ShowFlag = 0;
     public static int start = 0;
-    public static int begin= 0;
+    public static int begin = 0;
     public static int end, end2 = 0;
     public float max;
     public float max1;
@@ -197,12 +214,68 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     DataSet dataset = new DataSet();
     private Context context;
     ///////////////////////////////////////////////////////////////////////////////////////////
+    // Speedometer
     ///////////////////////////////////////////////////////////////////////////////////////////
+
+    private SharedPreferences sharedPreferences;
+    private LocationManager mLocationManager;
+    private static Data data;
+
+    private Toolbar toolbar;
+    private TextView satellite;
+    private TextView status;
+    private TextView accuracy;
+    private TextView currentSpeed;
+    private TextView maxSpeed;
+    private TextView averageSpeed;
+    private TextView gpsdistance;
+    private Chronometer time;
+    private Data.onGpsServiceUpdate onGpsServiceUpdate;
+    private ProgressBarCircularIndeterminate progressBarCircularIndeterminate;
+
+    private boolean firstfix;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_start);
+
+        // Speedometer
+        data = new Data(onGpsServiceUpdate);
+        satellite = (TextView) findViewById(R.id.satellite);
+
+        sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+
+
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+
+        onGpsServiceUpdate = new Data.onGpsServiceUpdate() {
+            @Override
+            public void update() {
+                maxSpeed.setText(data.getMaxSpeed());
+                gpsdistance.setText(data.getDistance());
+                if (sharedPreferences.getBoolean("auto_average", false)) {
+                    averageSpeed.setText(data.getAverageSpeedMotion());
+                } else {
+                    averageSpeed.setText(data.getAverageSpeed());
+                }
+            }
+        };
+
+        mLocationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
+
+        currentSpeed = (TextView) findViewById(R.id.currentSpeed);
+        progressBarCircularIndeterminate = (ProgressBarCircularIndeterminate) findViewById(R.id.progressBarCircularIndeterminate);
+
+        if (!data.isRunning()) {
+            data.setRunning(true);
+            data.setFirstTime(true);
+            startService(new Intent(getBaseContext(), GpsServices.class));
+        } else {
+            data.setRunning(false);
+            stopService(new Intent(getBaseContext(), GpsServices.class));
+        }
 
         orientationRoll = (TextView) findViewById(R.id.orientationRoll);
         leanView = (TextView) findViewById(R.id.lean_text_view);
@@ -247,43 +320,44 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             return;
         }
         // Gets the current location from GPS
-        if (location == null){
+        if (location == null) {
             location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
         }
 
         // Request location from GPS and find speed
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER,
                 1000, 0.2f, new LocationListener() {
-            @Override
-            public void onLocationChanged(Location location) {
-                updateSpeed(location);
-                speedFormer = speedLatter;
-                speedLatter = speed;
-            }
+                    @Override
+                    public void onLocationChanged(Location location) {
+                        updateSpeed(location);
+                        speedFormer = speedLatter;
+                        speedLatter = speed;
+                    }
 
-            @Override
-            public void onStatusChanged(String provider, int status, Bundle extras) {
+                    @Override
+                    public void onStatusChanged(String provider, int status, Bundle extras) {
 
-            }
+                    }
 
-            @Override
-            public void onProviderEnabled(String provider) {
-                try {
-                    updateSpeed(locationManager.getLastKnownLocation(provider));
-                }catch (SecurityException e){
-                    Log.d("Security Error","Security Error");
-                }
-            }
-            @Override
-            public void onProviderDisabled(String provider) {
-                updateSpeed(null);
-            }
-        });
+                    @Override
+                    public void onProviderEnabled(String provider) {
+                        try {
+                            updateSpeed(locationManager.getLastKnownLocation(provider));
+                        } catch (SecurityException e) {
+                            Log.d("Security Error", "Security Error");
+                        }
+                    }
+
+                    @Override
+                    public void onProviderDisabled(String provider) {
+                        updateSpeed(null);
+                    }
+                });
 
         // For avoiding null pointer exception from GPS location
         if (location == null) {
             location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-        }else{
+        } else {
             updateSpeed(location);
         }
 
@@ -299,13 +373,13 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             public void run() {
                 dataProcess();
             }
-        },0,50);
+        }, 0, 50);
         timer.schedule(new TimerTask() {
             @Override
             public void run() {
                 handler.sendEmptyMessage(0x110);
             }
-        },0,1000);
+        }, 0, 1000);
         // FINISH BUTTON //
         // Adding functionality to the finish button
         finishButton.setOnClickListener(new View.OnClickListener() {
@@ -326,6 +400,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 bundle.putFloat("U_TURNS", numberOfUTurns);
                 bundle.putFloat("DANGEROUS_LEFT_LEAN", numberOfDangerousLeftLeans);
                 bundle.putFloat("DANGEROUS_RIGHT_LEAN", numberOfDangerousRightLeans);
+                // reset speedometer data
+                resetData();
                 // Sending bundle to result activity
                 resultActivityIntent.putExtras(bundle);
                 // Starting result activity
@@ -343,8 +419,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         public void handleMessage(Message msg) {
             if (msg.what == 0x110) {
                 accelerationFromGps = speedLatter - speedFormer;
-            }else if (msg.what == 0x234){
-                switch ((String) msg.obj){
+            } else if (msg.what == 0x234) {
+                switch ((String) msg.obj) {
                     case "Leaning Left":
                         leanView.setText("Leaning Left");
                         showFlag = 0;
@@ -403,7 +479,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         double save = 0;
         int sensorType = sensorEvent.sensor.getType();
 
-        switch (sensorType){
+        switch (sensorType) {
             case Sensor.TYPE_ACCELEROMETER:
                 findOrientation.setAccelerometerValues(sensorValues);
                 accelerometerValues = sensorValues;
@@ -411,7 +487,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             case Sensor.TYPE_MAGNETIC_FIELD:
                 findOrientation.setMagnetometerValues(sensorValues);
                 magneticFieldValues = sensorValues;
-                sensorValues[0] = (float)Math.toDegrees(sensorValues[0]);
+                sensorValues[0] = (float) Math.toDegrees(sensorValues[0]);
                 break;
             case Sensor.TYPE_LINEAR_ACCELERATION:
                 // Z-axis acceleration
@@ -419,18 +495,18 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 accelerometerAcceleration = sensorValues[2];
 
                 movingAvgAcceleration.setValue((float) accelerometerAcceleration);
-                averacc= movingAvgAcceleration.getValue();
-                float csc=(float) Math.sin(calculateOrientation());
-                if(csc==0){
-                    csc=(float) 0.1;
+                averacc = movingAvgAcceleration.getValue();
+                float csc = (float) Math.sin(calculateOrientation());
+                if (csc == 0) {
+                    csc = (float) 0.1;
                 }
                 // Initialization of geoFrameAcceleration
                 // Horizontal acceleration
-                geoFrameAcceleration = averacc/csc;
-                if(Math.abs(geoFrameAcceleration)>=10){
-                    geoFrameAcceleration =save;
-                }else{
-                    save= geoFrameAcceleration;
+                geoFrameAcceleration = averacc / csc;
+                if (Math.abs(geoFrameAcceleration) >= 10) {
+                    geoFrameAcceleration = save;
+                } else {
+                    save = geoFrameAcceleration;
                 }
 
                 DecimalFormat df1 = new DecimalFormat("#.00");
@@ -444,9 +520,9 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 break;
             case Sensor.TYPE_GYROSCOPE:
                 gyroscopeValues = sensorEvent.values;
-                gyroYawRate = (float) Math.sqrt(gyroscopeValues[1]*gyroscopeValues[1]+gyroscopeValues[2]*gyroscopeValues[2]);
+                gyroYawRate = (float) Math.sqrt(gyroscopeValues[1] * gyroscopeValues[1] + gyroscopeValues[2] * gyroscopeValues[2]);
                 // To make the values positive
-                if((gyroscopeValues[1]+gyroscopeValues[2])<0){
+                if ((gyroscopeValues[1] + gyroscopeValues[2]) < 0) {
                     gyroYawRate = 0 - gyroYawRate;
                 }
                 break;
@@ -461,19 +537,19 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
 
                 message += df.format(X) + "  ";
                 message += df.format(Y) + "  ";
-                message += df.format(Z) +  "\n";
+                message += df.format(Z) + "\n";
                 break;
         }
         findOrientation.Calculate();
         float[] rollOrientation;
         rollOrientation = findOrientation.getOrientation();
         gyroRoll = Math.round(Math.toDegrees(rollOrientation[2]));
-        if (gyroRoll < 0){
+        if (gyroRoll < 0) {
             modGyroRoll = 0 - gyroRoll;
-        }else{
+        } else {
             modGyroRoll = gyroRoll;
         }
-        orientationRoll.setText(""+modGyroRoll+"°");
+        orientationRoll.setText("" + modGyroRoll + "°");
         View activityStart = findViewById(R.id.activity_start);
 //        if(modGyroRoll > 35){
 //            activityStart.setBackgroundColor(Color.parseColor("#F44336"));
@@ -485,6 +561,23 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     @Override
     public void onAccuracyChanged(Sensor sensor, int i) {
 
+    }
+
+    // Speedometer
+    public static Data getData() {
+        return data;
+    }
+
+    public void showGpsDisabledDialog() {
+        Dialog dialog = new Dialog(this, getResources().getString(R.string.gps_disabled), getResources().getString(R.string.please_enable_gps));
+
+        dialog.setOnAcceptButtonClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent("android.settings.LOCATION_SOURCE_SETTINGS"));
+            }
+        });
+        dialog.show();
     }
 
     private void dataProcess() {
@@ -544,37 +637,37 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         }
 
 
-        if (gyroRoll == 0 ){
+        if (gyroRoll == 0) {
             resultMessage.what = 0x234;
             resultMessage.obj = "No Lean";
             handler.sendMessage(resultMessage);
-        }else if (gyroRoll < 0){
+        } else if (gyroRoll < 0) {
             resultMessage.what = 0x234;
             resultMessage.obj = "Leaning Left";
             handler.sendMessage(resultMessage);
-            if (Math.abs(gyroRoll) > 35){
+            if (Math.abs(gyroRoll) > 35) {
                 resultMessage = new Message();
                 resultMessage.what = 0x234;
                 resultMessage.obj = "Dangerous Left Lean";
                 handler.sendMessage(resultMessage);
                 numberOfDangerousLeftLeans++;
-            }else if (Math.abs(gyroRoll)<35){
+            } else if (Math.abs(gyroRoll) < 35) {
                 resultMessage = new Message();
                 resultMessage.what = 0x234;
                 resultMessage.obj = "Remove Image";
                 handler.sendMessage(resultMessage);
             }
-        }else if (gyroRoll > 0){
+        } else if (gyroRoll > 0) {
             resultMessage.what = 0x234;
             resultMessage.obj = "Leaning Right";
             handler.sendMessage(resultMessage);
-            if (Math.abs(gyroRoll) > 35){
+            if (Math.abs(gyroRoll) > 35) {
                 resultMessage = new Message();
                 resultMessage.what = 0x234;
                 resultMessage.obj = "Dangerous Right Lean";
                 handler.sendMessage(resultMessage);
                 numberOfDangerousRightLeans++;
-            }else if (Math.abs(gyroRoll)<35){
+            } else if (Math.abs(gyroRoll) < 35) {
                 resultMessage = new Message();
                 resultMessage.what = 0x234;
                 resultMessage.obj = "Remove Image";
@@ -619,10 +712,10 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     resultMessage.obj = getString(R.string.u_turn_2);
                     handler.sendMessage(resultMessage);
                     numberOfUTurns++;
-                    state=No_Bump;
+                    state = No_Bump;
                     writeSDCard(simpleDateFormatString + "\t" + getString(R.string.u_turn_2) + "\t" + gyroYawRate2DF + "\t"
                             + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                            + "\t" + 0.05*(end-begin)+ "\t" + getDistance(speeds, vs, begin, end)
+                            + "\t" + 0.05 * (end - begin) + "\t" + getDistance(speeds, vs, begin, end)
                             + "\n");
                 }
 
@@ -679,7 +772,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                             numberOfRightTurns++;
                             writeSDCard(simpleDateFormatString + "\t" + "Right Turn"
                                     + "\t" + gyroYawRate2DF + "\t" + movingAvgGyroYawRate.getValue() + "\t"
-                                    + angle_calculate(vs, begin, end) + "\t" + 0.05*(end-begin)
+                                    + angle_calculate(vs, begin, end) + "\t" + 0.05 * (end - begin)
                                     + "\n");
                         } else if (angle_calculate(vs, begin, end2) <= 135 && angle_calculate(vs, begin, end2) >= 60) {
                             resultMessage = new Message();
@@ -689,7 +782,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                             numberOfLeftTurns++;
                             writeSDCard(simpleDateFormatString + "\t" + "Left Turn" + "\t"
                                     + gyroYawRate2DF + "\t" + movingAvgGyroYawRate.getValue() + "\t" +
-                                    + angle_calculate(vs, begin, end) + "\t" + 0.05*(end-begin)
+                                    +angle_calculate(vs, begin, end) + "\t" + 0.05 * (end - begin)
                                     + "\n");
                         } else if (Math.abs(angle_calculate(vs, begin, end)) > 135) {
                             resultMessage = new Message();
@@ -699,7 +792,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                             numberOfUTurns++;
                             writeSDCard(simpleDateFormatString + "\t" + getString(R.string.u_turn_2) + "\t" + gyroYawRate2DF
                                     + "\t" + movingAvgGyroYawRate.getValue() + "\t"
-                                    + angle_calculate(vs, begin, end) + "\t" + 0.05*(end-begin)
+                                    + angle_calculate(vs, begin, end) + "\t" + 0.05 * (end - begin)
                                     + "\t" + getDistance(speeds, vs, begin, end) + "\n");
                         }
                     }
@@ -715,7 +808,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         numberOfRightTurns++;
                         writeSDCard(simpleDateFormatString + "\t" + "Right Turn" + "\t" + gyroYawRate2DF
                                 + "\t" + movingAvgGyroYawRate.getValue() + "\t"
-                                + angle_calculate(vs, begin, end) + "\t" + 0.05*(end-begin) + "\n");
+                                + angle_calculate(vs, begin, end) + "\t" + 0.05 * (end - begin) + "\n");
                     } else if (angle_calculate(vs, begin, end) <= 135 && angle_calculate(vs, begin, end2) >= 60) {
                         resultMessage = new Message();
                         resultMessage.what = 0x234;
@@ -724,7 +817,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         numberOfLeftTurns++;
                         writeSDCard(simpleDateFormatString + "\t" + "Left Turn" + "\t" + gyroYawRate2DF + "\t"
                                 + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                                + "\t" + 0.05*(end-begin) + "\n");
+                                + "\t" + 0.05 * (end - begin) + "\n");
                     } else if (Math.abs(angle_calculate(vs, begin, end)) > 135) {
                         //Toast.makeText(MainActivity.this, "Turn Back", Toast.LENGTH_SHORT).show();
                         resultMessage = new Message();
@@ -734,7 +827,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         numberOfUTurns++;
                         writeSDCard(simpleDateFormatString + "\t" + getString(R.string.u_turn_2) + "\t" + gyroYawRate2DF + "\t"
                                 + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                                + "\t" + 0.05*(end-begin) + "\t" + getDistance(speeds, vs, begin, end)
+                                + "\t" + 0.05 * (end - begin) + "\t" + getDistance(speeds, vs, begin, end)
                                 + "\n");
                     } else {
                         resultMessage = new Message();
@@ -768,7 +861,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     numberOfRightTurns++;
                     writeSDCard(simpleDateFormatString + "\t" + "Right Turn" + "\t" + gyroYawRate2DF + "\t"
                             + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                            + "\t" + 0.05*(end-begin) + "\t" + "One_bump" + "\n");
+                            + "\t" + 0.05 * (end - begin) + "\t" + "One_bump" + "\n");
                 } else if (angle_calculate(vs, begin, end) <= 135 && angle_calculate(vs, begin, end) > 60) {
                     //Toast.makeText(MainActivity.this, "Turn Left finished", Toast.LENGTH_SHORT).show();
                     resultMessage = new Message();
@@ -778,7 +871,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     numberOfLeftTurns++;
                     writeSDCard(simpleDateFormatString + "\t" + "Left turn" + "\t" + gyroYawRate2DF + "\t"
                             + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                            + "\t" + 0.05*(end-begin) + "\t" + "One_bump" + "\n");
+                            + "\t" + 0.05 * (end - begin) + "\t" + "One_bump" + "\n");
                 } else if (Math.abs(angle_calculate(vs, begin, end)) > 135) {
                     //Toast.makeText(MainActivity.this, "Turn Back", Toast.LENGTH_SHORT).show();
                     resultMessage = new Message();
@@ -787,7 +880,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     handler.sendMessage(resultMessage);
                     writeSDCard(simpleDateFormatString + "\t" + getString(R.string.u_turn_2) + "\t" + gyroYawRate2DF + "\t"
                             + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                            + "\t" + 0.05*(end-begin) + "\t" + getDistance(speeds, vs, begin, end)
+                            + "\t" + 0.05 * (end - begin) + "\t" + getDistance(speeds, vs, begin, end)
                             + "\t" + "One_bump" + "\n");
                     //At this point the car U-turn, should be accompanied by turn signal lights
                 } else {
@@ -943,17 +1036,151 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         }
     }
 
+    public void resetData(){
+       data = new Data(onGpsServiceUpdate);
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_UI);
+
+        firstfix = true;
+        if (!data.isRunning()) {
+            Gson gson = new Gson();
+            String json = sharedPreferences.getString("data", "");
+            data = gson.fromJson(json, Data.class);
+        }
+        if (data == null) {
+            data = new Data(onGpsServiceUpdate);
+        } else {
+            data.setOnGpsServiceUpdate(onGpsServiceUpdate);
+        }
+
+        if (mLocationManager.getAllProviders().indexOf(LocationManager.GPS_PROVIDER) >= 0) {
+            mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500, 0, this);
+        } else {
+            Log.w("MainActivity", "No GPS location provider found. GPS data display will not be available.");
+        }
+
+        if (!mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            showGpsDisabledDialog();
+        }
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        mLocationManager.addGpsStatusListener(this);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         sensorManager.unregisterListener(this);
+        stopService(new Intent(getBaseContext(), GpsServices.class));
+    }
+
+    @Override
+    public void onGpsStatusChanged(int event) {
+        switch (event) {
+            case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    // TODO: Consider calling
+                    //    ActivityCompat#requestPermissions
+                    // here to request the missing permissions, and then overriding
+                    //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                    //                                          int[] grantResults)
+                    // to handle the case where the user grants the permission. See the documentation
+                    // for ActivityCompat#requestPermissions for more details.
+                    return;
+                }
+                GpsStatus gpsStatus = mLocationManager.getGpsStatus(null);
+                int satsInView = 0;
+                int satsUsed = 0;
+                Iterable<GpsSatellite> sats = gpsStatus.getSatellites();
+                for (GpsSatellite sat : sats) {
+                    satsInView++;
+                    if (sat.usedInFix()) {
+                        satsUsed++;
+                    }
+                }
+                satellite.setText("Active Sats: "+String.valueOf(satsUsed) + "/" + String.valueOf(satsInView));
+                if (satsUsed == 0) {
+                    data.setRunning(false);
+                    stopService(new Intent(getBaseContext(), GpsServices.class));
+                    firstfix = true;
+                }
+                break;
+
+            case GpsStatus.GPS_EVENT_STOPPED:
+                if (!mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    showGpsDisabledDialog();
+                }
+                break;
+            case GpsStatus.GPS_EVENT_FIRST_FIX:
+                break;
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mLocationManager.removeUpdates(this);
+        mLocationManager.removeGpsStatusListener(this);
+        SharedPreferences.Editor prefsEditor = sharedPreferences.edit();
+        Gson gson = new Gson();
+        String json = gson.toJson(data);
+        prefsEditor.putString("data", json);
+        prefsEditor.commit();
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        if (location.hasAccuracy()) {
+            SpannableString s = new SpannableString(String.format("%.0f", location.getAccuracy()) + "m");
+            s.setSpan(new RelativeSizeSpan(0.75f), s.length()-1, s.length(), 0);
+
+            if (firstfix){
+                firstfix = false;
+            }
+        }else{
+            firstfix = true;
+        }
+
+        if (location.hasSpeed()) {
+            progressBarCircularIndeterminate.setVisibility(View.GONE);
+            String speed = String.format(Locale.ENGLISH, "%.0f", location.getSpeed() * 3.6) + "km/h";
+
+            if (sharedPreferences.getBoolean("miles_per_hour", false)) { // Convert to MPH
+                speed = String.format(Locale.ENGLISH, "%.0f", location.getSpeed() * 3.6 * 0.62137119) + "mi/h";
+            }
+            SpannableString s = new SpannableString(speed);
+            s.setSpan(new RelativeSizeSpan(0.25f), s.length()-4, s.length(), 0);
+            currentSpeed.setText(s);
+        }
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
     }
 }
