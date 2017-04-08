@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "942082621642",
+    "firebase_url": "https://behave-6f9fa.firebaseio.com",
+    "project_id": "behave-6f9fa",
+    "storage_bucket": "behave-6f9fa.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:942082621642:android:e316945bc74b6bec",
+        "android_client_info": {
+          "package_name": "com.bupt.hammad.behave"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "942082621642-lmsp31bnldgfersaf6nc1es1ftplm9qj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBN16W7W1GdmNKw-th_f-QhTuPRWKXDLv8"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "942082621642-lmsp31bnldgfersaf6nc1es1ftplm9qj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
