@@ -106,7 +106,7 @@ public class MainActivity extends AppCompatActivity {
 
         //Instantiating startButton
         Button startButton = (Button) findViewById(R.id.startButton);
-        //Attaching onClickListener to the startButton, which will start the startActivity
+        //Attaching onClickListener to the startButton, which will twoHundredCounter the startActivity
         startButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {

@@ -5,7 +5,7 @@ import android.hardware.SensorManager;
 public class CalculateOrientation {
 
     // This variable stores the device orientation data in the form of
-    // Azimuth z-axis rotation, Pitch x-axis rotation and Roll y-axis rotation
+    // Azimuth badAngleThreshold-axis rotation, Pitch x-axis rotation and Roll y-axis rotation
     private float[] orientation = new float[3];
     // This variable stores the Rotation matrix vector
     private float[] rotationMatrix = new float[9];

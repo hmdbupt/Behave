@@ -5,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -18,8 +17,6 @@ import android.location.LocationManager;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
-import android.os.PowerManager;
-import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -29,7 +26,6 @@ import android.text.SpannableString;
 import android.text.style.RelativeSizeSpan;
 import android.util.Log;
 import android.view.View;
-import android.view.Window;
 import android.widget.Button;
 import android.widget.Chronometer;
 import android.widget.ImageView;
@@ -49,7 +45,6 @@ import java.util.TimerTask;
 import com.gc.materialdesign.views.ProgressBarCircularIndeterminate;
 import com.gc.materialdesign.widgets.Dialog;
 import com.google.gson.Gson;
-import com.melnykov.fab.FloatingActionButton;
 
 public class StartActivity extends AppCompatActivity implements SensorEventListener, LocationListener, GpsStatus.Listener {
 
@@ -73,11 +68,14 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     Sensor accelerometer;
     Sensor magnetometer;
     Sensor gyroscope;
+    Sensor rotationVector;
+    Sensor linearAccelerometer;
     //
     // Moving averages
     MovingAverage movingAvgGyroYawRate;
     MovingAverage movingAvgDirection;
     MovingAverage movingAvgAcceleration;
+    MovingAverage movingAvgGyroRoll;
     //
     CalculateOrientation findOrientation = new CalculateOrientation();
     ///////////////////////
@@ -85,12 +83,11 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     ///////////////////////
     // Longs
     //
-    //Trip start time, trip end time and total ride time
+    //Trip twoHundredCounter time, trip end time and total ride time
     private long startTime;
     private long endTime;
     private long rideTime;
     private long gyroRoll;
-    long modGyroRoll = 0;
     // Strings //
     //
     //Convert ride time into string
@@ -99,11 +96,14 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     // int //
     int leaningCounter = 0;
     int showFlag = 0;
+    int turnLowerLimit = 50;
+    int turnUpperLimit = 135;
     //
     // float //
     private float speed;
     private float speedLatter = 0;
     private float speedFormer;
+    private float samplingRate = 0.05f;
     ///////////////////////
 
     // TextViews //
@@ -115,7 +115,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
 
 
     //Gets the Yaw rate from gyroscope
-    public float gyroYawRate = (float) 0;
+    public float gyroYawRate;
     public float gyroYawRate2DF;
 
     //////////////////////////////////////////////////////////////////////////////
@@ -127,12 +127,17 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     //WAITING FOR BUMP state is fulfilled when left/right lane change is about to happen
     final static int Waiting_for_Bump = 2;
 
+    //Lean States
+    final static int No_Lean = 0;
+    final static int One_Lean = 1;
+    final static int Waiting_Lean = 2;
+
     //delta L value for filtering out lower noise
     final static float deltaL = (float) 0.1;
     //delta H value for filtering out higher noise
     final static float deltaH = (float) 0.2;
 
-    float z = (float) 1.0;
+    float badAngleThreshold = (float) 1.0;
     final static float t = (float) 0.6;
     final static float T_NEXT_DELAY = (float) 2.0;
 
@@ -151,7 +156,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public double accelerometerAcceleration2DF;
     public double geoFrameAcceleration;//acceleration in the geo-frame
     public double averalinear1;
-    public double averacc;
+    public double averagedAccelerometerAcceleration;
     public double averacc2DF;
     public double hpaveracc;
     public double hpaveracc2DF;
@@ -168,12 +173,15 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public float numberOfEmergencyBrakes = 0;
 
     public int ShowFlag = 0;
-    public static int start = 0;
+    public static int twoHundredCounter = 0;
     public static int begin = 0;
     public static int end, end2 = 0;
     public float max;
     public float max1;
+    public float leanMax;
     public float T_BUMP, T_BUMP2, T_dwell = 0;
+    float leanTime = 0;
+
 
     //To save NO BUMP state
     public int state = No_Bump;
@@ -184,9 +192,12 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public float calculateAngle;
     public float KalmanFilterSpeed;
     public double calculateOrientation;
-    public float[] vs = new float[200];
-    public float[] speeds = new float[200];
-    public float[] velocitys = new float[200];
+    public float[] angularVelocityFromGyro = new float[200];
+    public float[] speedArray = new float[200];
+    public float[] averageVelocityFromAccelerometer = new float[200];
+
+    //To save dangerous lean
+    public int leanState = No_Lean;
 
     Timer timer = new Timer();
     // Get the three dimensional values from accelerometer
@@ -196,7 +207,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public float[] magneticFieldValues = new float[3];
 
     // This variable stores the device orientation data in the form of
-    // Azimuth z-axis rotation, Pitch x-axis rotation and Roll y-axis rotation
+    // Azimuth badAngleThreshold-axis rotation, Pitch x-axis rotation and Roll y-axis rotation
     public float[] orientation = new float[3];
 
     // Gyroscope Values
@@ -228,12 +239,12 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     private TextView currentSpeed;
     private TextView maxSpeed;
     private TextView averageSpeed;
-    private TextView gpsdistance;
+    private TextView gpsDistance;
     private Chronometer time;
     private Data.onGpsServiceUpdate onGpsServiceUpdate;
     private ProgressBarCircularIndeterminate progressBarCircularIndeterminate;
 
-    private boolean firstfix;
+    private boolean firstFix;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -243,18 +254,14 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         // Speedometer
         data = new Data(onGpsServiceUpdate);
         satellite = (TextView) findViewById(R.id.satellite);
+//        gpsDistance = (TextView) findViewById(R.id.distance);
 
         sharedPreferences = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-
-
-        toolbar = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
 
         onGpsServiceUpdate = new Data.onGpsServiceUpdate() {
             @Override
             public void update() {
-                maxSpeed.setText(data.getMaxSpeed());
-                gpsdistance.setText(data.getDistance());
+                gpsDistance.setText(data.getDistance());
                 if (sharedPreferences.getBoolean("auto_average", false)) {
                     averageSpeed.setText(data.getAverageSpeedMotion());
                 } else {
@@ -267,15 +274,6 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
 
         currentSpeed = (TextView) findViewById(R.id.currentSpeed);
         progressBarCircularIndeterminate = (ProgressBarCircularIndeterminate) findViewById(R.id.progressBarCircularIndeterminate);
-
-        if (!data.isRunning()) {
-            data.setRunning(true);
-            data.setFirstTime(true);
-            startService(new Intent(getBaseContext(), GpsServices.class));
-        } else {
-            data.setRunning(false);
-            stopService(new Intent(getBaseContext(), GpsServices.class));
-        }
 
         orientationRoll = (TextView) findViewById(R.id.orientationRoll);
         leanView = (TextView) findViewById(R.id.lean_text_view);
@@ -295,16 +293,16 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        rotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
 
-        ACC_OF_BRAKE = -2.0f;
-        EMERGENCY = -5.0f;
-        z = 1.0f;
+        linearAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
 
         // Initializing moving averages
         movingAvgGyroYawRate = new MovingAverage(15);
         movingAvgDirection = new MovingAverage(5);
         movingAvgAcceleration = new MovingAverage(3);
+        movingAvgGyroRoll = new MovingAverage(5);
 
         hudView.setText("Riding Straight");
 
@@ -391,7 +389,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 rideTime = endTime - startTime;
                 // Converting time from milliseconds format to 00:00:00 and saving into string
                 stringRideTime = TimeConverter.formatLongToString(rideTime);
-                // Creating an Intent to start result activity
+                // Creating an Intent to twoHundredCounter result activity
                 Intent resultActivityIntent = new Intent(StartActivity.this, ResultActivity.class);
                 // Packaging bundle with data
                 bundle.putString("RIDE_TIME", stringRideTime);
@@ -400,8 +398,9 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 bundle.putFloat("U_TURNS", numberOfUTurns);
                 bundle.putFloat("DANGEROUS_LEFT_LEAN", numberOfDangerousLeftLeans);
                 bundle.putFloat("DANGEROUS_RIGHT_LEAN", numberOfDangerousRightLeans);
-                // reset speedometer data
-                resetData();
+                bundle.putFloat("BRAKES", numberOfBrakes);
+                bundle.putFloat("EMERGENCY_BRAKES", numberOfEmergencyBrakes);
+
                 // Sending bundle to result activity
                 resultActivityIntent.putExtras(bundle);
                 // Starting result activity
@@ -472,97 +471,6 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         }
     };
 
-    @Override
-    public void onSensorChanged(SensorEvent sensorEvent) {
-        // A float array that can store values from various sensors
-        float[] sensorValues = sensorEvent.values;
-        double save = 0;
-        int sensorType = sensorEvent.sensor.getType();
-
-        switch (sensorType) {
-            case Sensor.TYPE_ACCELEROMETER:
-                findOrientation.setAccelerometerValues(sensorValues);
-                accelerometerValues = sensorValues;
-                break;
-            case Sensor.TYPE_MAGNETIC_FIELD:
-                findOrientation.setMagnetometerValues(sensorValues);
-                magneticFieldValues = sensorValues;
-                sensorValues[0] = (float) Math.toDegrees(sensorValues[0]);
-                break;
-            case Sensor.TYPE_LINEAR_ACCELERATION:
-                // Z-axis acceleration
-                // values[2] represent the z-axis
-                accelerometerAcceleration = sensorValues[2];
-
-                movingAvgAcceleration.setValue((float) accelerometerAcceleration);
-                averacc = movingAvgAcceleration.getValue();
-                float csc = (float) Math.sin(calculateOrientation());
-                if (csc == 0) {
-                    csc = (float) 0.1;
-                }
-                // Initialization of geoFrameAcceleration
-                // Horizontal acceleration
-                geoFrameAcceleration = averacc / csc;
-                if (Math.abs(geoFrameAcceleration) >= 10) {
-                    geoFrameAcceleration = save;
-                } else {
-                    save = geoFrameAcceleration;
-                }
-
-                DecimalFormat df1 = new DecimalFormat("#.00");
-
-                accelerometerAcceleration2DF = Double.valueOf(df1.format(accelerometerAcceleration));
-                averacc2DF = Double.valueOf(df1.format(averacc));
-                hpaveracc2DF = Double.valueOf(df1.format(hpaveracc));
-                // Initialization of averalinear1
-                averalinear1 = Double.valueOf(df1.format(geoFrameAcceleration));
-
-                break;
-            case Sensor.TYPE_GYROSCOPE:
-                gyroscopeValues = sensorEvent.values;
-                gyroYawRate = (float) Math.sqrt(gyroscopeValues[1] * gyroscopeValues[1] + gyroscopeValues[2] * gyroscopeValues[2]);
-                // To make the values positive
-                if ((gyroscopeValues[1] + gyroscopeValues[2]) < 0) {
-                    gyroYawRate = 0 - gyroYawRate;
-                }
-                break;
-            case Sensor.TYPE_ROTATION_VECTOR:
-
-                String message = new String();
-                DecimalFormat df = new DecimalFormat("#,##0.000");
-
-                float X = sensorValues[0];
-                float Y = sensorValues[1];
-                float Z = sensorValues[2];
-
-                message += df.format(X) + "  ";
-                message += df.format(Y) + "  ";
-                message += df.format(Z) + "\n";
-                break;
-        }
-        findOrientation.Calculate();
-        float[] rollOrientation;
-        rollOrientation = findOrientation.getOrientation();
-        gyroRoll = Math.round(Math.toDegrees(rollOrientation[2]));
-        if (gyroRoll < 0) {
-            modGyroRoll = 0 - gyroRoll;
-        } else {
-            modGyroRoll = gyroRoll;
-        }
-        orientationRoll.setText("" + modGyroRoll + "°");
-        View activityStart = findViewById(R.id.activity_start);
-//        if(modGyroRoll > 35){
-//            activityStart.setBackgroundColor(Color.parseColor("#F44336"));
-//        }else{
-//            activityStart.setBackgroundColor(Color.parseColor("#FF3F51B5"));
-//        }
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int i) {
-
-    }
-
     // Speedometer
     public static Data getData() {
         return data;
@@ -580,29 +488,29 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         dialog.show();
     }
 
+
     private void dataProcess() {
         Message resultMessage = new Message();
         movingAvgGyroYawRate.setValue(gyroYawRate);
         gyroYawRate = movingAvgGyroYawRate.getValue();
-        vs[start] = gyroYawRate;
+        angularVelocityFromGyro[twoHundredCounter] = gyroYawRate;
 
-        averageVelocity += geoFrameAcceleration * 0.05;
+        averageVelocity += geoFrameAcceleration * samplingRate;
         DecimalFormat df = new DecimalFormat("#.00");
         averageVelocity2DF = Float.valueOf(df.format(averageVelocity));
 
-        velocitys[start] = averageVelocity;
+        averageVelocityFromAccelerometer[twoHundredCounter] = averageVelocity;
         KalmanFilterSpeed = algorithmKalmanFilter();
-        speeds[start] = speed;
-        start = (start + 1) % 200;   // start++ until 200, after 200 start again from 0
+        speedArray[twoHundredCounter] = speed; // speedArray saves the current speed value into array
+        twoHundredCounter = (twoHundredCounter + 1) % 200;   // twoHundredCounter++ until 200, after 200 twoHundredCounter again from 0
 
-
-        tDistance = Math.abs(getDistance(speeds, vs, (start + 199) % 200, start));//Change to start
-        calculateAngle = angle_calculate(vs, (start + 199) % 200, start);//Change to start
+        tDistance = Math.abs(getDistance(speedArray, angularVelocityFromGyro, (twoHundredCounter + 199) % 200, twoHundredCounter));//Change to twoHundredCounter
+        calculateAngle = angle_calculate(angularVelocityFromGyro, (twoHundredCounter + 199) % 200, twoHundredCounter);//Change to twoHundredCounter
         calculateOrientation = calculateOrientation();
 
 
-        distance = Math.abs(getDistance(speeds, vs, begin, start));
-        ang = angle_calculate(vs, begin, start);
+        distance = Math.abs(getDistance(speedArray, angularVelocityFromGyro, begin, twoHundredCounter));
+        ang = angle_calculate(angularVelocityFromGyro, begin, twoHundredCounter);
 
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy-MM-dd   HH:mm:ss");
@@ -613,6 +521,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 + "\t" + speed + "\t" + KalmanFilterSpeed + "\t" + gyroYawRate2DF + "\t"
                 + movingAvgGyroYawRate.getValue() + "\t" + ang + "\t" + calculateOrientation + "\t"
                 + distance + "\t" + calculateAngle + "\t" + tDistance + "\t" + "\n");
+
         //Determine the brake
         if (averalinear1 <= ACC_OF_BRAKE) {
             FLAG_OF_BRAKE++;
@@ -626,6 +535,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 handler.sendMessage(resultMessage);
                 numberOfBrakes++;
                 if (MAX_OF_BRAKE < EMERGENCY) {
+                    resultMessage = new Message();
                     resultMessage.what = 0x234;
                     resultMessage.obj = "Emergency Brake";
                     handler.sendMessage(resultMessage);
@@ -638,19 +548,28 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
 
 
         if (gyroRoll == 0) {
+            resultMessage = new Message();
             resultMessage.what = 0x234;
             resultMessage.obj = "No Lean";
             handler.sendMessage(resultMessage);
         } else if (gyroRoll < 0) {
+            resultMessage = new Message();
             resultMessage.what = 0x234;
             resultMessage.obj = "Leaning Left";
             handler.sendMessage(resultMessage);
-            if (Math.abs(gyroRoll) > 35) {
-                resultMessage = new Message();
-                resultMessage.what = 0x234;
-                resultMessage.obj = "Dangerous Left Lean";
-                handler.sendMessage(resultMessage);
+            if (leanState==No_Lean && Math.abs(gyroRoll) > 35) {
+                leanTime += 0.05;
+                if (leanTime >= 1) {
+                    leanState = One_Lean;
+                    resultMessage = new Message();
+                    resultMessage.what = 0x234;
+                    resultMessage.obj = "Dangerous Left Lean";
+                    handler.sendMessage(resultMessage);
+                    leanTime = 0;
+                }
+            } else if (leanState == One_Lean && Math.abs(gyroRoll) < 35){
                 numberOfDangerousLeftLeans++;
+                leanState = No_Lean;
             } else if (Math.abs(gyroRoll) < 35) {
                 resultMessage = new Message();
                 resultMessage.what = 0x234;
@@ -658,15 +577,23 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 handler.sendMessage(resultMessage);
             }
         } else if (gyroRoll > 0) {
+            resultMessage = new Message();
             resultMessage.what = 0x234;
             resultMessage.obj = "Leaning Right";
             handler.sendMessage(resultMessage);
-            if (Math.abs(gyroRoll) > 35) {
-                resultMessage = new Message();
-                resultMessage.what = 0x234;
-                resultMessage.obj = "Dangerous Right Lean";
-                handler.sendMessage(resultMessage);
+            if (leanState==No_Lean && Math.abs(gyroRoll) > 35) {
+                leanTime += 0.05;
+                if (leanTime >= 1) {
+                    leanState = One_Lean;
+                    resultMessage = new Message();
+                    resultMessage.what = 0x234;
+                    resultMessage.obj = "Dangerous Right Lean";
+                    handler.sendMessage(resultMessage);
+                    leanTime = 0;
+                }
+            } else if (leanState == One_Lean && Math.abs(gyroRoll) < 35){
                 numberOfDangerousRightLeans++;
+                leanState = No_Lean;
             } else if (Math.abs(gyroRoll) < 35) {
                 resultMessage = new Message();
                 resultMessage.what = 0x234;
@@ -682,20 +609,22 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         if (state == No_Bump && Math.abs(gyroYawRate) > deltaL) {
             state = One_Bump;
 
-            begin = start;
+            begin = twoHundredCounter;
             max = gyroYawRate;
 
         } else if (state == One_Bump && Math.abs(gyroYawRate) > deltaL) {      //At this time, a bump state is obtained
-            if (Math.abs(gyroYawRate) > z) {
+            // It will be considered as a bad turn if the gyroYawRate is greater than 1 radian
+            // which is equal to 57.295 degrees
+            if (Math.abs(gyroYawRate) > badAngleThreshold) {
                 BAD_TURN_1 = 1;
             }
 
-            T_BUMP = T_BUMP + (float) 0.05;                 //The dwell time of the first bump
+            T_BUMP = T_BUMP + samplingRate;                 //The dwell time of the first bump
             if (Math.abs(gyroYawRate) > Math.abs(max)) {
                 max = gyroYawRate;
             }                               //Calculate the maximum yaw rate during the measurement
         } else if (state == One_Bump && Math.abs(gyroYawRate) <= deltaL) {
-            end = start;
+            end = twoHundredCounter;
 
 
             if (Math.abs(max) > deltaH && T_BUMP > t) {
@@ -706,7 +635,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 state = Waiting_for_Bump;
                 max = 0;
 
-                if (Math.abs(angle_calculate(vs, begin, end)) > 135) {
+                if (Math.abs(angle_calculate(angularVelocityFromGyro, begin, end)) > turnUpperLimit) {
                     resultMessage = new Message();
                     resultMessage.what = 0x234;
                     resultMessage.obj = getString(R.string.u_turn_2);
@@ -714,8 +643,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     numberOfUTurns++;
                     state = No_Bump;
                     writeSDCard(simpleDateFormatString + "\t" + getString(R.string.u_turn_2) + "\t" + gyroYawRate2DF + "\t"
-                            + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                            + "\t" + 0.05 * (end - begin) + "\t" + getDistance(speeds, vs, begin, end)
+                            + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(angularVelocityFromGyro, begin, end)
+                            + "\t" + samplingRate * (end - begin) + "\t" + getDistance(speedArray, angularVelocityFromGyro, begin, end)
                             + "\n");
                 }
 
@@ -735,35 +664,38 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         } else if (state == Waiting_for_Bump) {
             //If this is the case to enter the wait for the bump state
             if (Math.abs(gyroYawRate) <= deltaL && start_of_2nd_bump == 0) {
-                T_dwell = T_dwell + (float) 0.05;
-                //Calculate the time between the second deltaL value of the previous bump and the first deltaL value of the next bump
+                T_dwell = T_dwell + samplingRate;
+                // Calculate the time between the second deltaL value of the previous bump and
+                // the first deltaL value of the next bump
             }
 
             //If the time interval between two deltaL more than 2 seconds will not play finished
-            if (T_dwell < T_NEXT_DELAY && Math.abs(gyroYawRate) > deltaL) {   //如果两个凸点之间的时间间隔小于陀螺仪读数的最大停留时间，且陀螺仪读数大于s，进入第二个凸点状态
+            if (T_dwell < T_NEXT_DELAY && Math.abs(gyroYawRate) > deltaL) {   //If the time interval
+                // between two bumps is less than the maximum dwell time of the gyroscope readings,
+                // and the gyro readings are larger than S, enter the second bump state
 
-                T_BUMP2 = T_BUMP2 + (float) 0.05;            //第二个凸点的停留时间
-                start_of_2nd_bump = 1;                   //开启第二个凸点状态
-                if (Math.abs(gyroYawRate) > z) {
+                T_BUMP2 = T_BUMP2 + samplingRate;            //Dwelling time of the second bump
+                start_of_2nd_bump = 1;                   //Start second bump state
+                if (Math.abs(gyroYawRate) > badAngleThreshold) {
                     BAD_TURN_2 = 1;
                 }
-                if (Math.abs(gyroYawRate) > Math.abs(max)) {          //计算第二个凸点状态中的最大偏航率
+                if (Math.abs(gyroYawRate) > Math.abs(max)) {          //Calculate the maximum yaw rate in a second bump state
                     max = gyroYawRate;
                 }
 
-            } else if (Math.abs(gyroYawRate) <= deltaL && start_of_2nd_bump == 1) {    //算法已经进入第二个凸点状态，且已经结束 未必是凸点
-                end2 = start;
+            } else if (Math.abs(gyroYawRate) <= deltaL && start_of_2nd_bump == 1) {    //The algorithm has entered the second bump state and is not necessarily a bump
+                end2 = twoHundredCounter;
 
-                //有效的凸点
+                //Effective bumps
                 if (Math.abs(max) > deltaH && T_BUMP2 > t) {
-                    //5月4日 删除了距离的下限 只要第二个凸点结束就会提示变道
+                    //Removes the lower bounds of the distance as long as the second bumps ends, the change is prompted.
 
                     ALL_OF_BUMP++;
                     BAD_TURN += BAD_TURN_2;
 
-                    //两个反向凸点区分变道、在弯曲的道路上
+                    //Two opposite bumps distinguish between paths and curved roads
                     if (max * max1 > 0) {
-                        if (angle_calculate(vs, begin, end2) <= -60 && angle_calculate(vs, begin, end2) >= -135) {
+                        if (angle_calculate(angularVelocityFromGyro, begin, end2) <= -turnLowerLimit && angle_calculate(angularVelocityFromGyro, begin, end2) >= -turnUpperLimit) {
                             //Toast.makeText(MainActivity.this, "Turn Right finished", Toast.LENGTH_SHORT).show();
                             resultMessage = new Message();
                             resultMessage.what = 0x234;
@@ -772,9 +704,9 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                             numberOfRightTurns++;
                             writeSDCard(simpleDateFormatString + "\t" + "Right Turn"
                                     + "\t" + gyroYawRate2DF + "\t" + movingAvgGyroYawRate.getValue() + "\t"
-                                    + angle_calculate(vs, begin, end) + "\t" + 0.05 * (end - begin)
+                                    + angle_calculate(angularVelocityFromGyro, begin, end) + "\t" + samplingRate * (end - begin)
                                     + "\n");
-                        } else if (angle_calculate(vs, begin, end2) <= 135 && angle_calculate(vs, begin, end2) >= 60) {
+                        } else if (angle_calculate(angularVelocityFromGyro, begin, end2) <= turnUpperLimit && angle_calculate(angularVelocityFromGyro, begin, end2) >= turnLowerLimit) {
                             resultMessage = new Message();
                             resultMessage.what = 0x234;
                             resultMessage.obj = "Left Turn";
@@ -782,9 +714,9 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                             numberOfLeftTurns++;
                             writeSDCard(simpleDateFormatString + "\t" + "Left Turn" + "\t"
                                     + gyroYawRate2DF + "\t" + movingAvgGyroYawRate.getValue() + "\t" +
-                                    +angle_calculate(vs, begin, end) + "\t" + 0.05 * (end - begin)
+                                    +angle_calculate(angularVelocityFromGyro, begin, end) + "\t" + samplingRate * (end - begin)
                                     + "\n");
-                        } else if (Math.abs(angle_calculate(vs, begin, end)) > 135) {
+                        } else if (Math.abs(angle_calculate(angularVelocityFromGyro, begin, end)) > turnUpperLimit) {
                             resultMessage = new Message();
                             resultMessage.what = 0x234;
                             resultMessage.obj = getString(R.string.u_turn_2);
@@ -792,15 +724,14 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                             numberOfUTurns++;
                             writeSDCard(simpleDateFormatString + "\t" + getString(R.string.u_turn_2) + "\t" + gyroYawRate2DF
                                     + "\t" + movingAvgGyroYawRate.getValue() + "\t"
-                                    + angle_calculate(vs, begin, end) + "\t" + 0.05 * (end - begin)
-                                    + "\t" + getDistance(speeds, vs, begin, end) + "\n");
+                                    + angle_calculate(angularVelocityFromGyro, begin, end) + "\t" + samplingRate * (end - begin)
+                                    + "\t" + getDistance(speedArray, angularVelocityFromGyro, begin, end) + "\n");
                         }
                     }
-//        						}
                 }
                 //Invalid bump
                 else {
-                    if (angle_calculate(vs, begin, end) <= -60 && angle_calculate(vs, begin, end2) >= -135) {
+                    if (angle_calculate(angularVelocityFromGyro, begin, end) <= -turnLowerLimit && angle_calculate(angularVelocityFromGyro, begin, end2) >= -turnUpperLimit) {
                         resultMessage = new Message();
                         resultMessage.what = 0x234;
                         resultMessage.obj = "Right Turn";
@@ -808,17 +739,17 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         numberOfRightTurns++;
                         writeSDCard(simpleDateFormatString + "\t" + "Right Turn" + "\t" + gyroYawRate2DF
                                 + "\t" + movingAvgGyroYawRate.getValue() + "\t"
-                                + angle_calculate(vs, begin, end) + "\t" + 0.05 * (end - begin) + "\n");
-                    } else if (angle_calculate(vs, begin, end) <= 135 && angle_calculate(vs, begin, end2) >= 60) {
+                                + angle_calculate(angularVelocityFromGyro, begin, end) + "\t" + samplingRate * (end - begin) + "\n");
+                    } else if (angle_calculate(angularVelocityFromGyro, begin, end) <= turnUpperLimit && angle_calculate(angularVelocityFromGyro, begin, end2) >= turnLowerLimit) {
                         resultMessage = new Message();
                         resultMessage.what = 0x234;
                         resultMessage.obj = "Left Turn";
                         handler.sendMessage(resultMessage);
                         numberOfLeftTurns++;
                         writeSDCard(simpleDateFormatString + "\t" + "Left Turn" + "\t" + gyroYawRate2DF + "\t"
-                                + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                                + "\t" + 0.05 * (end - begin) + "\n");
-                    } else if (Math.abs(angle_calculate(vs, begin, end)) > 135) {
+                                + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(angularVelocityFromGyro, begin, end)
+                                + "\t" + samplingRate * (end - begin) + "\n");
+                    } else if (Math.abs(angle_calculate(angularVelocityFromGyro, begin, end)) > turnUpperLimit) {
                         //Toast.makeText(MainActivity.this, "Turn Back", Toast.LENGTH_SHORT).show();
                         resultMessage = new Message();
                         resultMessage.what = 0x234;
@@ -826,8 +757,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                         handler.sendMessage(resultMessage);
                         numberOfUTurns++;
                         writeSDCard(simpleDateFormatString + "\t" + getString(R.string.u_turn_2) + "\t" + gyroYawRate2DF + "\t"
-                                + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                                + "\t" + 0.05 * (end - begin) + "\t" + getDistance(speeds, vs, begin, end)
+                                + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(angularVelocityFromGyro, begin, end)
+                                + "\t" + samplingRate * (end - begin) + "\t" + getDistance(speedArray, angularVelocityFromGyro, begin, end)
                                 + "\n");
                     } else {
                         resultMessage = new Message();
@@ -849,10 +780,10 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 BAD_TURN_2 = 0;
 
             } else if (T_dwell >= T_NEXT_DELAY) {
-                end2 = start;
+                end2 = twoHundredCounter;
 
                 //At this time, it is determined that there is only one bump
-                if (angle_calculate(vs, begin, end) < -60 && angle_calculate(vs, begin, end) >= -135) {
+                if (angle_calculate(angularVelocityFromGyro, begin, end) < -turnLowerLimit && angle_calculate(angularVelocityFromGyro, begin, end) >= -turnUpperLimit) {
                     //Toast.makeText(MainActivity.this, "Turn Right finished", Toast.LENGTH_SHORT).show();
                     resultMessage = new Message();
                     resultMessage.what = 0x234;
@@ -860,9 +791,9 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     handler.sendMessage(resultMessage);
                     numberOfRightTurns++;
                     writeSDCard(simpleDateFormatString + "\t" + "Right Turn" + "\t" + gyroYawRate2DF + "\t"
-                            + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                            + "\t" + 0.05 * (end - begin) + "\t" + "One_bump" + "\n");
-                } else if (angle_calculate(vs, begin, end) <= 135 && angle_calculate(vs, begin, end) > 60) {
+                            + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(angularVelocityFromGyro, begin, end)
+                            + "\t" + samplingRate * (end - begin) + "\t" + "One_bump" + "\n");
+                } else if (angle_calculate(angularVelocityFromGyro, begin, end) <= turnUpperLimit && angle_calculate(angularVelocityFromGyro, begin, end) > turnLowerLimit) {
                     //Toast.makeText(MainActivity.this, "Turn Left finished", Toast.LENGTH_SHORT).show();
                     resultMessage = new Message();
                     resultMessage.what = 0x234;
@@ -870,17 +801,17 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                     handler.sendMessage(resultMessage);
                     numberOfLeftTurns++;
                     writeSDCard(simpleDateFormatString + "\t" + "Left turn" + "\t" + gyroYawRate2DF + "\t"
-                            + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                            + "\t" + 0.05 * (end - begin) + "\t" + "One_bump" + "\n");
-                } else if (Math.abs(angle_calculate(vs, begin, end)) > 135) {
+                            + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(angularVelocityFromGyro, begin, end)
+                            + "\t" + samplingRate * (end - begin) + "\t" + "One_bump" + "\n");
+                } else if (Math.abs(angle_calculate(angularVelocityFromGyro, begin, end)) > turnUpperLimit) {
                     //Toast.makeText(MainActivity.this, "Turn Back", Toast.LENGTH_SHORT).show();
                     resultMessage = new Message();
                     resultMessage.what = 0x234;
                     resultMessage.obj = getString(R.string.u_turn_2);
                     handler.sendMessage(resultMessage);
                     writeSDCard(simpleDateFormatString + "\t" + getString(R.string.u_turn_2) + "\t" + gyroYawRate2DF + "\t"
-                            + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(vs, begin, end)
-                            + "\t" + 0.05 * (end - begin) + "\t" + getDistance(speeds, vs, begin, end)
+                            + movingAvgGyroYawRate.getValue() + "\t" + angle_calculate(angularVelocityFromGyro, begin, end)
+                            + "\t" + samplingRate * (end - begin) + "\t" + getDistance(speedArray, angularVelocityFromGyro, begin, end)
                             + "\t" + "One_bump" + "\n");
                     //At this point the car U-turn, should be accompanied by turn signal lights
                 } else {
@@ -913,27 +844,27 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             for (int i = begin; i < end; i++) {
                 // angle = angle before * time (100ms/0.1s)The angle is equal to the original angle
                 // plus the gyro angular velocity multiplied by 0.1 seconds
-                angle = angle + angularVelocityGyro[i] * (float) 0.05;
+                angle = angle + angularVelocityGyro[i] * samplingRate;
                 //horizontal displacement The horizontal distance is equal to the velocity multiplied by the time in 0.1 seconds
                 // times the sin value
-                horizontalDisplacement = horizontalDisplacement + ve[i] * (float) 0.05 * (float) Math.sin(angle);
+                horizontalDisplacement = horizontalDisplacement + ve[i] * samplingRate * (float) Math.sin(angle);
             }
         } else if (end < begin) {
             for (int i = begin; i < 200; i++) {
                 //angle=angle before * time (100ms/0.1s)The angle is equal to the original angle
                 // plus the gyro angular velocity multiplied by 0.1 seconds
-                angle = angle + angularVelocityGyro[i] * (float) 0.05;
+                angle = angle + angularVelocityGyro[i] * samplingRate;
                 //horizontal displacement The horizontal distance is equal to the velocity multiplied by the time in 0.1 seconds
                 // times the sin value
-                horizontalDisplacement = horizontalDisplacement + ve[i] * (float) 0.05 * (float) Math.sin(angle);
+                horizontalDisplacement = horizontalDisplacement + ve[i] * samplingRate * (float) Math.sin(angle);
             }
             for (int i = 0; i <= end; i++) {
                 //angle=angle before * time (100ms/0.1s) The angle is equal to the original angle
                 // plus the gyro angular velocity multiplied by 0.1 seconds
-                angle = angle + angularVelocityGyro[i] * (float) 0.05;
+                angle = angle + angularVelocityGyro[i] * samplingRate;
                 //horizontal displacement The horizontal distance is equal to the velocity multiplied by the time in 0.1 seconds
                 // times the sin value
-                horizontalDisplacement = horizontalDisplacement + ve[i] * (float) 0.05 * (float) Math.sin(angle);
+                horizontalDisplacement = horizontalDisplacement + ve[i] * samplingRate * (float) Math.sin(angle);
             }
         }
 
@@ -944,25 +875,23 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     }
 
     //The return value is the angle
-    public float angle_calculate(float[] vs, int b, int e) {
+    public float angle_calculate(float[] vs, int begin, int end) {
         float angle = 0;
         float angle2DF;
-        if (e >= b) {
-            for (int n = b; n <= e; n++) {
-                angle = (float) (angle + vs[n] * 0.05 * 57.29578);
+        if (end >= begin) {
+            for (int n = begin; n <= end; n++) {
+                angle = (float) (angle + vs[n] * samplingRate * 57.29578);
             }
-        } else if (e < b) {
-            for (int n = b; n < 200; n++) {
-                angle = (float) (angle + vs[n] * 0.05 * 57.29578);
-            }
-            for (int n = 0; n <= e; n++) {
-                angle = (float) (angle + vs[n] * 0.05 * 57.29578);
+        } else if (end < begin) {
+//            for (int n = begin; n < 200; n++) {
+//                angle = (float) (angle + vs[n] * samplingRate * 57.29578);
+//            }
+            for (int n = 0; n <= end; n++) {
+                angle = (float) (angle + vs[n] * samplingRate * 57.29578);
             }
         }
-
         DecimalFormat df2 = new DecimalFormat("#.00");
         angle2DF = Float.valueOf(df2.format(angle));
-
         return angle2DF;
     }
 
@@ -1003,7 +932,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         float p_11;
         // This will return the estimated velocity after applying Kalman filter
         float estimatedVelocity;
-        x_10 = (float) (dataset.getX_00() + 0.05 * averalinear1);
+        x_10 = (float) (dataset.getX_00() + samplingRate * averalinear1);
         p_10 = dataset.getP_00() + dataset.getQ();
         K = p_10 / (p_10 + dataset.getR());
         x_11 = x_10 + K * (speed - x_10);
@@ -1036,8 +965,16 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         }
     }
 
-    public void resetData(){
-       data = new Data(onGpsServiceUpdate);
+    @Override
+    protected void onPause() {
+        super.onPause();
+        mLocationManager.removeUpdates(this);
+        mLocationManager.removeGpsStatusListener(this);
+        SharedPreferences.Editor prefsEditor = sharedPreferences.edit();
+        Gson gson = new Gson();
+        String json = gson.toJson(data);
+        prefsEditor.putString("data", json);
+        prefsEditor.commit();
     }
 
     @Override
@@ -1046,8 +983,10 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_UI);
+        sensorManager.registerListener(this, rotationVector, SensorManager.SENSOR_DELAY_NORMAL);
+        sensorManager.registerListener(this, linearAccelerometer, SensorManager.SENSOR_DELAY_NORMAL);
 
-        firstfix = true;
+        firstFix = true;
         if (!data.isRunning()) {
             Gson gson = new Gson();
             String json = sharedPreferences.getString("data", "");
@@ -1090,6 +1029,21 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     }
 
     @Override
+    public void onProviderEnabled(String provider) {
+
+    }
+
+    @Override
+    public void onProviderDisabled(String provider) {
+
+    }
+
+    @Override
+    public void onStatusChanged(String provider, int status, Bundle extras) {
+
+    }
+
+    @Override
     public void onGpsStatusChanged(int event) {
         switch (event) {
             case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
@@ -1117,7 +1071,14 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 if (satsUsed == 0) {
                     data.setRunning(false);
                     stopService(new Intent(getBaseContext(), GpsServices.class));
-                    firstfix = true;
+                    firstFix = true;
+                }else if (satsUsed == 1){
+                    if (!data.isRunning()) {
+                        data.setRunning(true);
+                        data.setFirstTime(true);
+                        startService(new Intent(getBaseContext(), GpsServices.class));
+//                        gpsDistance.setText(data.getDistance());
+                    }
                 }
                 break;
 
@@ -1132,28 +1093,16 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        mLocationManager.removeUpdates(this);
-        mLocationManager.removeGpsStatusListener(this);
-        SharedPreferences.Editor prefsEditor = sharedPreferences.edit();
-        Gson gson = new Gson();
-        String json = gson.toJson(data);
-        prefsEditor.putString("data", json);
-        prefsEditor.commit();
-    }
-
-    @Override
     public void onLocationChanged(Location location) {
         if (location.hasAccuracy()) {
             SpannableString s = new SpannableString(String.format("%.0f", location.getAccuracy()) + "m");
             s.setSpan(new RelativeSizeSpan(0.75f), s.length()-1, s.length(), 0);
 
-            if (firstfix){
-                firstfix = false;
+            if (firstFix){
+                firstFix = false;
             }
         }else{
-            firstfix = true;
+            firstFix = true;
         }
 
         if (location.hasSpeed()) {
@@ -1170,17 +1119,90 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     }
 
     @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
+    public void onSensorChanged(SensorEvent sensorEvent) {
+        // A float array that can store values from various sensors
+        float[] sensorValues = sensorEvent.values;
+        double save = 0;
+        int sensorType = sensorEvent.sensor.getType();
 
+        switch (sensorType) {
+            case Sensor.TYPE_ACCELEROMETER:
+                findOrientation.setAccelerometerValues(sensorValues);
+                accelerometerValues = sensorValues;
+                break;
+            case Sensor.TYPE_MAGNETIC_FIELD:
+                findOrientation.setMagnetometerValues(sensorValues);
+                magneticFieldValues = sensorValues;
+                sensorValues[0] = (float) Math.toDegrees(sensorValues[0]);
+                break;
+            case Sensor.TYPE_LINEAR_ACCELERATION:
+                // Z-axis acceleration
+                // values[2] represent the badAngleThreshold-axis
+                // It should be y-axis values not badAngleThreshold-axis
+                // y-axis = values[1]
+                String aaa;
+                accelerometerAcceleration = sensorValues[1];
+
+                movingAvgAcceleration.setValue((float) accelerometerAcceleration);
+                averagedAccelerometerAcceleration = movingAvgAcceleration.getValue();
+
+                float csc = (float) Math.sin(calculateOrientation());
+                if (csc == 0) {
+                    csc = (float) 0.1;
+                }
+                // Initialization of geoFrameAcceleration
+                // Horizontal acceleration
+                geoFrameAcceleration = averagedAccelerometerAcceleration / csc;
+                if (Math.abs(geoFrameAcceleration) >= 10) {
+                    geoFrameAcceleration = save;
+                } else {
+                    save = geoFrameAcceleration;
+                }
+
+                DecimalFormat df1 = new DecimalFormat("#.00");
+
+                accelerometerAcceleration2DF = Double.valueOf(df1.format(accelerometerAcceleration));
+                averacc2DF = Double.valueOf(df1.format(averagedAccelerometerAcceleration));
+                hpaveracc2DF = Double.valueOf(df1.format(hpaveracc));
+                // Initialization of averalinear1
+                averalinear1 = Double.valueOf(df1.format(geoFrameAcceleration));
+
+
+
+                break;
+            case Sensor.TYPE_GYROSCOPE:
+                gyroscopeValues = sensorEvent.values;
+                gyroYawRate = (float) Math.sqrt(gyroscopeValues[1] * gyroscopeValues[1] + gyroscopeValues[2] * gyroscopeValues[2]);
+                // To make the values positive
+                if ((gyroscopeValues[1] + gyroscopeValues[2]) < 0) {
+                    gyroYawRate = 0 - gyroYawRate;
+                }
+                break;
+            case Sensor.TYPE_ROTATION_VECTOR:
+
+                String message = new String();
+                DecimalFormat df = new DecimalFormat("#,##0.000");
+
+                float X = sensorValues[0];
+                float Y = sensorValues[1];
+                float Z = sensorValues[2];
+
+                message += df.format(X) + "  ";
+                message += df.format(Y) + "  ";
+                message += df.format(Z) + "\n";
+                break;
+        }
+        findOrientation.Calculate();
+        float[] rollOrientation;
+        rollOrientation = findOrientation.getOrientation();
+        gyroRoll = Math.round(Math.toDegrees(rollOrientation[2]));
+        movingAvgGyroRoll.setValue(gyroRoll);
+        gyroRoll = (long) movingAvgGyroRoll.getValue();
+        orientationRoll.setText("" + Math.abs(gyroRoll) + "°");
     }
 
     @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
+    public void onAccuracyChanged(Sensor sensor, int i) {
 
     }
 }
