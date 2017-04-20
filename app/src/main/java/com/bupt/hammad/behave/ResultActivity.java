@@ -27,6 +27,8 @@ public class ResultActivity extends AppCompatActivity {
     private int uTurns;
     private float dangerousLeftLeans;
     private float dangerousRightLeans;
+    private float brakes;
+    private float emergencyBrakes;
 
     // Filename
     private String filename = "Riding stats.txt";
@@ -43,6 +45,8 @@ public class ResultActivity extends AppCompatActivity {
         TextView uTurnTextView = (TextView) findViewById(R.id.uTurnTextView);
 //        TextView dangerousLeftLean = (TextView) findViewById(R.id.dangerousLeftLean);
 //        TextView dangerousRightLean = (TextView) findViewById(R.id.dangerousRightLean);
+        TextView brakesTextView = (TextView) findViewById(R.id.brakes);
+        TextView emergencyBrakesTextView = (TextView) findViewById(R.id.emergencyBrakes);
 
         Intent iResultActivity = new Intent();
         iResultActivity.getExtras();
@@ -57,11 +61,17 @@ public class ResultActivity extends AppCompatActivity {
         uTurns = (int) bundle.getFloat("U_TURNS");
         dangerousLeftLeans = bundle.getFloat("DANGEROUS_LEFT_LEAN");
         dangerousRightLeans = bundle.getFloat("DANGEROUS_RIGHT_LEAN");
+        brakes = bundle.getFloat("BRAKES");
+        emergencyBrakes = bundle.getFloat("EMERGENCY_BRAKES");
 
         driveTimeTextView.setText("Total Riding Time: "+driveTime);
         leftTurnTextView.setText("Left Turns: "+leftTurns);
         rightTurnTextView.setText("Right Turns: "+rightTurns);
         uTurnTextView.setText("U-Turns: "+uTurns);
+//        dangerousLeftLean.setText("DLL: "+dangerousLeftLeans);
+        brakesTextView.setText("Brakes: "+brakes);
+        emergencyBrakesTextView.setText("Emergency Brakes: "+emergencyBrakes);
+
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("| yyyy-MM-dd | HH:mm:ss |");
         String simpleDateFormatString = simpleDateFormat.format(new Date());
