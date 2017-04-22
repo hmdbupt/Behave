@@ -4,13 +4,11 @@ import android.content.Intent;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -28,7 +26,7 @@ public class ResultActivity extends AppCompatActivity {
     private int dangerousLeftLeans;
     private int dangerousRightLeans;
     private int brakes;
-    private int emergencyBrakes;
+    private int dangerousBrakes;
 
     // Filename
     private String filename = "Riding stats.txt";
@@ -62,7 +60,7 @@ public class ResultActivity extends AppCompatActivity {
         dangerousLeftLeans = (int) bundle.getFloat("DANGEROUS_LEFT_LEAN");
         dangerousRightLeans = (int) bundle.getFloat("DANGEROUS_RIGHT_LEAN");
         brakes = (int) bundle.getFloat("BRAKES");
-        emergencyBrakes = (int) bundle.getFloat("EMERGENCY_BRAKES");
+        dangerousBrakes = (int) bundle.getFloat("DANGEROUS_BRAKES");
 
         driveTimeTextView.setText("Total Riding Time: "+driveTime);
         leftTurnTextView.setText("Left Turns: "+leftTurns);
@@ -71,17 +69,21 @@ public class ResultActivity extends AppCompatActivity {
         dangerousLeftLeanTextView.setText("Dangerous Left Leans: "+dangerousLeftLeans);
         dangerousRightLeanTextView.setText("Dangerous Right Leans: "+dangerousRightLeans);
         brakesTextView.setText("Brakes: "+brakes);
-        emergencyBrakesTextView.setText("Emergency Brakes: "+emergencyBrakes);
+        emergencyBrakesTextView.setText("Dangerous Brakes: "+ dangerousBrakes);
 
 
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("| yyyy-MM-dd | HH:mm:ss |");
         String simpleDateFormatString = simpleDateFormat.format(new Date());
 
-        writeSDCard("===== "+simpleDateFormatString+" ====="+"\n"+
-                "Total riding time: "+driveTime+"\n"+
-                "Left turns: "+leftTurns+"\n"+
-                "Right turns: "+rightTurns+"\n"+
-                "U-Turns: "+uTurns+"\n");
+        writeSDCard("===== "+simpleDateFormatString+" ====="+
+                "\nTotal Riding Time: "+driveTime+
+                "\nLeft Turns: "+leftTurns+
+                "\nRight Turns: "+rightTurns+
+                "\nU-Turns: "+uTurns+
+                "\nBrakes: "+brakes+
+                "\nDangerous Brakes"+ dangerousBrakes +
+                "\nDangerous Left Leans: "+dangerousLeftLeans+
+                "\nDangerous Right Leans: "+dangerousRightLeans);
 //        dangerousLeftLeanTextView.setText("Dangerous Left Leans: "+dangerousLeftLeans);
 //        dangerousRightLeanTextView.setText("Dangerous Right Leans: "+dangerousRightLeans);
 
