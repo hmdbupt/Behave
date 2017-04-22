@@ -77,11 +77,15 @@ public class ResultActivity extends AppCompatActivity {
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("| yyyy-MM-dd | HH:mm:ss |");
         String simpleDateFormatString = simpleDateFormat.format(new Date());
 
-        writeSDCard("===== "+simpleDateFormatString+" ====="+"\n"+
-                "Total riding time: "+driveTime+"\n"+
-                "Left turns: "+leftTurns+"\n"+
-                "Right turns: "+rightTurns+"\n"+
-                "U-Turns: "+uTurns+"\n");
+        writeSDCard("===== "+simpleDateFormatString+" ====="+
+                "\nTotal Riding Time: "+driveTime+
+                "\nLeft Turns: "+leftTurns+
+                "\nRight Turns: "+rightTurns+
+                "\nU-Turns: "+uTurns+
+                "\nDangerous Left Leans: "+dangerousLeftLeans+
+                "\nDangerous Right Leans: "+dangerousRightLeans+
+                "\nBrakes: "+brakes+
+                "\nEmergency Brakes"+emergencyBrakes);
 //        dangerousLeftLeanTextView.setText("Dangerous Left Leans: "+dangerousLeftLeans);
 //        dangerousRightLeanTextView.setText("Dangerous Right Leans: "+dangerousRightLeans);
 

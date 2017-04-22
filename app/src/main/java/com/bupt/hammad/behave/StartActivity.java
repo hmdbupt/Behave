@@ -94,7 +94,6 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     private String stringRideTime;
     //
     // int //
-    int leaningCounter = 0;
     int showFlag = 0;
     int turnLowerLimit = 50;
     int turnUpperLimit = 135;
@@ -104,6 +103,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     private float speedLatter = 0;
     private float speedFormer;
     private float samplingRate = 0.05f;
+    private float acceleration;
     ///////////////////////
 
     // TextViews //
@@ -128,9 +128,15 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     final static int Waiting_for_Bump = 2;
 
     //Lean States
+    public int leanState = No_Lean;
     final static int No_Lean = 0;
-    final static int One_Lean = 1;
-    final static int Waiting_Lean = 2;
+    final static int In_Lean = 1;
+    //Break States
+    public int brakeState = No_Brake;
+    final static int No_Brake = 0;
+    final static int In_Brake = 1;
+    //Emergency Brake States
+    public int emergencyBrakeState = No_Brake;
 
     //delta L value for filtering out lower noise
     final static float deltaL = (float) 0.1;
@@ -141,8 +147,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     final static float t = (float) 0.6;
     final static float T_NEXT_DELAY = (float) 2.0;
 
-    float ACC_OF_BRAKE = (float) -2.0;
-    float EMERGENCY = (float) -5.0;
+    float brakeThreshold = (float) -2.0;
+    float emergencyBrakeThreshold = (float) -5.0;
 
     public float ALL_OF_BUMP = 0;
     public float BAD_TURN_1 = 0;
@@ -155,7 +161,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public double accelerometerAcceleration;
     public double accelerometerAcceleration2DF;
     public double geoFrameAcceleration;//acceleration in the geo-frame
-    public double averalinear1;
+    public double geoFrameAcceleration2DF;
     public double averagedAccelerometerAcceleration;
     public double averacc2DF;
     public double hpaveracc;
@@ -178,9 +184,10 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public static int end, end2 = 0;
     public float max;
     public float max1;
-    public float leanMax;
     public float T_BUMP, T_BUMP2, T_dwell = 0;
     float leanTime = 0;
+    float brakeTime = 0;
+    float emergencyBrakeTime = 0;
 
 
     //To save NO BUMP state
@@ -196,9 +203,6 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public float[] speedArray = new float[200];
     public float[] averageVelocityFromAccelerometer = new float[200];
 
-    //To save dangerous lean
-    public int leanState = No_Lean;
-
     Timer timer = new Timer();
     // Get the three dimensional values from accelerometer
     public float[] accelerometerValues = new float[3];
@@ -207,7 +211,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
     public float[] magneticFieldValues = new float[3];
 
     // This variable stores the device orientation data in the form of
-    // Azimuth badAngleThreshold-axis rotation, Pitch x-axis rotation and Roll y-axis rotation
+    // Azimuth z-axis rotation, Pitch x-axis rotation and Roll y-axis rotation
     public float[] orientation = new float[3];
 
     // Gyroscope Values
@@ -517,33 +521,37 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         String simpleDateFormatString = simpleDateFormat.format(new Date());
 
         writeSDCard(simpleDateFormatString + "\t" + accelerometerAcceleration2DF + "\t" + averacc2DF + "\t"
-                + averalinear1 + "\t" + accelerationFromGps + "\t" + averageVelocity2DF
+                + geoFrameAcceleration2DF + "\t" + accelerationFromGps + "\t" + averageVelocity2DF
                 + "\t" + speed + "\t" + KalmanFilterSpeed + "\t" + gyroYawRate2DF + "\t"
                 + movingAvgGyroYawRate.getValue() + "\t" + ang + "\t" + calculateOrientation + "\t"
                 + distance + "\t" + calculateAngle + "\t" + tDistance + "\t" + "\n");
 
-        //Determine the brake
-        if (averalinear1 <= ACC_OF_BRAKE) {
-            FLAG_OF_BRAKE++;
-            if (averalinear1 < MAX_OF_BRAKE) {
-                MAX_OF_BRAKE = (float) averalinear1;
-            }
-        } else if (averalinear1 > ACC_OF_BRAKE) {
-            if (FLAG_OF_BRAKE > 2) {
-                resultMessage.what = 0x234;
-                resultMessage.obj = "Brake";
-                handler.sendMessage(resultMessage);
-                numberOfBrakes++;
-                if (MAX_OF_BRAKE < EMERGENCY) {
+        //Brake detection algorithm
+        if (acceleration <= brakeThreshold){
+            if (acceleration <= emergencyBrakeThreshold){
+                if (emergencyBrakeState == No_Brake){
+                    emergencyBrakeState = In_Brake;
                     resultMessage = new Message();
                     resultMessage.what = 0x234;
                     resultMessage.obj = "Emergency Brake";
                     handler.sendMessage(resultMessage);
-                    numberOfEmergencyBrakes++;
+                    }
+            } else {
+                if (brakeState == No_Brake){
+                    brakeState = In_Brake;
+                    resultMessage.what = 0x234;
+                    resultMessage.obj = "Brake";
+                    handler.sendMessage(resultMessage);
                 }
             }
-            MAX_OF_BRAKE = 0;
-            FLAG_OF_BRAKE = 0;
+        }
+        if (emergencyBrakeState == In_Brake && acceleration >= emergencyBrakeThreshold){
+            numberOfEmergencyBrakes++;
+            emergencyBrakeState = No_Brake;
+        }
+        if (brakeState == In_Brake && acceleration >= brakeThreshold){
+            numberOfBrakes++;
+            brakeState = No_Brake;
         }
 
 
@@ -560,14 +568,14 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             if (leanState==No_Lean && Math.abs(gyroRoll) > 35) {
                 leanTime += 0.05;
                 if (leanTime >= 1) {
-                    leanState = One_Lean;
+                    leanState = In_Lean;
                     resultMessage = new Message();
                     resultMessage.what = 0x234;
                     resultMessage.obj = "Dangerous Left Lean";
                     handler.sendMessage(resultMessage);
                     leanTime = 0;
                 }
-            } else if (leanState == One_Lean && Math.abs(gyroRoll) < 35){
+            } else if (leanState == In_Lean && Math.abs(gyroRoll) < 35){
                 numberOfDangerousLeftLeans++;
                 leanState = No_Lean;
             } else if (Math.abs(gyroRoll) < 35) {
@@ -584,14 +592,14 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
             if (leanState==No_Lean && Math.abs(gyroRoll) > 35) {
                 leanTime += 0.05;
                 if (leanTime >= 1) {
-                    leanState = One_Lean;
+                    leanState = In_Lean;
                     resultMessage = new Message();
                     resultMessage.what = 0x234;
                     resultMessage.obj = "Dangerous Right Lean";
                     handler.sendMessage(resultMessage);
                     leanTime = 0;
                 }
-            } else if (leanState == One_Lean && Math.abs(gyroRoll) < 35){
+            } else if (leanState == In_Lean && Math.abs(gyroRoll) < 35){
                 numberOfDangerousRightLeans++;
                 leanState = No_Lean;
             } else if (Math.abs(gyroRoll) < 35) {
@@ -932,7 +940,7 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
         float p_11;
         // This will return the estimated velocity after applying Kalman filter
         float estimatedVelocity;
-        x_10 = (float) (dataset.getX_00() + samplingRate * averalinear1);
+        x_10 = (float) (dataset.getX_00() + samplingRate * geoFrameAcceleration2DF);
         p_10 = dataset.getP_00() + dataset.getQ();
         K = p_10 / (p_10 + dataset.getR());
         x_11 = x_10 + K * (speed - x_10);
@@ -1137,11 +1145,11 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 break;
             case Sensor.TYPE_LINEAR_ACCELERATION:
                 // Z-axis acceleration
-                // values[2] represent the badAngleThreshold-axis
-                // It should be y-axis values not badAngleThreshold-axis
+                // values[2] represent the z-axis
+                // It should be y-axis values not z-axis
                 // y-axis = values[1]
-                String aaa;
-                accelerometerAcceleration = sensorValues[1];
+                accelerometerAcceleration = sensorValues[2];
+                acceleration = sensorValues[1];
 
                 movingAvgAcceleration.setValue((float) accelerometerAcceleration);
                 averagedAccelerometerAcceleration = movingAvgAcceleration.getValue();
@@ -1164,8 +1172,8 @@ public class StartActivity extends AppCompatActivity implements SensorEventListe
                 accelerometerAcceleration2DF = Double.valueOf(df1.format(accelerometerAcceleration));
                 averacc2DF = Double.valueOf(df1.format(averagedAccelerometerAcceleration));
                 hpaveracc2DF = Double.valueOf(df1.format(hpaveracc));
-                // Initialization of averalinear1
-                averalinear1 = Double.valueOf(df1.format(geoFrameAcceleration));
+                // Initialization of geoFrameAcceleration2DF
+                geoFrameAcceleration2DF = Double.valueOf(df1.format(geoFrameAcceleration));
 
 
 
